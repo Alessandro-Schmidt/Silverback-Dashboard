@@ -1,4 +1,4 @@
-// Team view (design board "Team"), for organization owners only: the repo's and org's Silverback rate,
+// Team view (design board "Team"), open to everyone: the repo's and org's Silverback rate,
 // team totals, merged per week, review balance, things that need attention, and a sortable members table.
 import { crest } from "./crest.js";
 import { fetchTeam, periodLabel, tier } from "./stats.js";
@@ -89,7 +89,7 @@ function draw() {
     <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px">
       <div><h1 style="font-size:26px;font-weight:700;letter-spacing:-.01em">Team performance</h1>
         <p class="muted" style="margin:4px 0 0">${org} · ${repoName} · ${t.rows.length} active member${t.rows.length === 1 ? "" : "s"} ${periodLabel(t.period, t.at)}</p></div>
-      <span class="owner-chip">Owner view · only organization owners see this page</span></div>
+      </div>
     <section class="team-stats" aria-label="Organization stats">
       ${rankCard(`Silverback rate · ${repoName}`, t.rate)}${rankCard(`Silverback rate · ${org}`, s.orgRate)}
       ${stat("Merged PRs", t.merged, "all members, into develop")}

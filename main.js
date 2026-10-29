@@ -72,7 +72,6 @@ function render(s) {
   showRepo(s.repo);
   if (!s.mine) return; // cache from an older version
   shown = s;
-  $("tabs").hidden = !s.owner;
   for (const a of $("tabs").querySelectorAll("a")) a.toggleAttribute("aria-current", a.dataset.view === view());
   if (view() === "team") return route();
   const repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
@@ -238,7 +237,7 @@ async function load(animate) {
     const s = await fetchStats(token, repo, org, validPeriod(p));
     await set("stats", JSON.stringify(s));
     render(s);
-    if (view() === "team" && s.owner) await loadTeam(token, s);
+    if (view() === "team") await loadTeam(token, s);
     status.textContent = `Updated ${time(s.at)}`;
     await finish(true);
   } catch (e) {
@@ -252,21 +251,17 @@ async function load(animate) {
   }
 }
 
-// Views: My stats (#) and Team (#team). Team only exists for organization owners; anyone else gets a 404.
+// Views: My stats (#) and Team (#team), open to everyone.
 const view = () => (location.hash === "#team" ? "team" : "me");
 function route() {
   for (const a of $("tabs").querySelectorAll("a")) a.toggleAttribute("aria-current", a.dataset.view === view());
   if (!shown) return;
   if (view() === "me") return render(shown);
-  if (!shown.owner) {
-    app.innerHTML = `<div class="notfound"><h1 style="font-size:40px">404</h1><p class="muted">This page doesn't exist, or only organization owners can see it.</p><a href="#" style="color:var(--link)">Back to my stats</a></div>`;
-    return;
-  }
   renderTeam(app, shown);
 }
 window.addEventListener("hashchange", async () => {
   route();
-  if (view() === "team" && shown?.owner && !busy) {
+  if (view() === "team" && shown && !busy) {
     busy = true; setBusy(true);
     try { await loadTeam(await get("token"), shown); } catch (e) { $("banner-text").textContent = `Couldn't load the team (${e.message}).`; $("banner").hidden = false; }
     finally { busy = false; setBusy(false); }

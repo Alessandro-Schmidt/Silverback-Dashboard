@@ -4,7 +4,7 @@ const REVIEWS = "reviews(first:50){ nodes{ state submittedAt } }";
 export const QUERY = `query($owner:String!,$name:String!,$org:String!,$qOpen:String!,$qMerged:String!,$qIssues:String!,$qDevelop:String!,$qFirst:String!,$qRepo:String!,$qOrg:String!){
   viewer{ login avatarUrl }
   repository(owner:$owner,name:$name){ pullRequests(states:OPEN){totalCount} issues(states:OPEN){totalCount} stargazerCount }
-  organization(login:$org){ avatarUrl viewerCanAdminister repositories(first:100){ totalCount nodes{ pullRequests(states:OPEN){totalCount} languages(first:10){ edges{ size node{ name } } } } } }
+  organization(login:$org){ avatarUrl repositories(first:100){ totalCount nodes{ pullRequests(states:OPEN){totalCount} languages(first:10){ edges{ size node{ name } } } } } }
   myOpen: search(query:$qOpen,type:ISSUE,first:100){ nodes{ ... on PullRequest { number title url isDraft createdAt headRefName comments{totalCount} reviews{totalCount} } } }
   myFirst: search(query:$qFirst,type:ISSUE,first:1){ nodes{ ... on PullRequest { createdAt } ... on Issue { createdAt } } }
   myMerged: search(query:$qMerged,type:ISSUE,first:1){ issueCount }
@@ -123,7 +123,6 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
     repo, org, at: now, period, since: since.getTime(),
     prs: r.pullRequests.totalCount, issues: r.issues.totalCount, stars: r.stargazerCount,
     me: data.viewer.login, meAvatar: data.viewer.avatarUrl, orgRepos: o.totalCount, orgLogo: data.organization.avatarUrl,
-    owner: !!data.organization.viewerCanAdminister,
     orgPrs: o.nodes.reduce((s, n) => s + n.pullRequests.totalCount, 0),
     // Oldest first; `type` is the branch prefix (feat/…, fix/…).
     myOpen: data.myOpen.nodes.map((p) => ({ num: p.number, title: p.title, url: p.url, draft: p.isDraft, comments: p.comments.totalCount, reviews: p.reviews.totalCount,
@@ -181,10 +180,10 @@ export async function fetchStats(token, repo, org, period = DEFAULT_PERIOD) {
       qRepo: `repo:${repo} is:pr is:merged base:develop${after(since)}`, qOrg: `org:${org} is:pr is:merged${after(since)}` }), repo, org, period, now);
 }
 
-// ---- Team view (organization owners only) ----
+// ---- Team view ----
 
 const TEAM_QUERY = `query($org:String!,$q:String!,$after:String){
-  organization(login:$org){ viewerCanAdminister membersWithRole(first:100){ edges{ role node{ login avatarUrl } } } }
+  organization(login:$org){ membersWithRole(first:100){ edges{ role node{ login avatarUrl } } } }
   search(query:$q,type:ISSUE,first:100,after:$after){ pageInfo{ hasNextPage endCursor } nodes{ ... on PullRequest {
     number title url isDraft state createdAt mergedAt baseRefName author{ login avatarUrl }
     reviews(first:50){ nodes{ state submittedAt author{ login } } } } } }
@@ -198,7 +197,6 @@ export async function fetchTeam(token, repo, org, period = DEFAULT_PERIOD) {
   let data, after = null;
   for (let page = 0; page < 5; page++) {
     data = await gql(token, TEAM_QUERY, { org, q: `repo:${repo} is:pr updated:>=${from.toISOString()}`, after });
-    if (!data.organization.viewerCanAdminister) throw new Error("Only organization owners can see the team view.");
     prs.push(...data.search.nodes);
     if (!data.search.pageInfo.hasNextPage) break;
     after = data.search.pageInfo.endCursor;

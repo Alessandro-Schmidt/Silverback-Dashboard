@@ -143,7 +143,7 @@
   .results { display: grid; gap: 8px; margin-bottom: 14px; }
   .results .issue { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
 
-  /* Tabs: My stats | Team (owners only) */
+  /* Tabs: My stats | Team */
   .tabs { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--edge); border-radius: 10px; padding: 3px; }
   .tabs a { display: flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--muted); }
   .tabs a:hover { color: var(--fg); text-decoration: none; } .tabs a[aria-current] { background: var(--line); color: var(--fg); }
@@ -186,7 +186,6 @@
   .sortbtn { background: none; border: 0; padding: 6px 0; color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; min-height: 32px; }
   .sortbtn:hover, .sortbtn.on { color: var(--fg); }
   #member-search { min-height: 36px; width: 220px; max-width: 100%; padding: 0 12px; background: var(--bg); border: 1px solid var(--edge); border-radius: 8px; font-size: 13px; }
-  .notfound { text-align: center; padding: 80px 0; }
 </style>
 </head>
 <body>
@@ -196,7 +195,7 @@
     <span><b>Silverback</b><small>Ship like you mean it.</small></span>
   </a>
   <span class="divider" aria-hidden="true"></span>
-  <nav id="tabs" class="tabs" aria-label="View" hidden><a href="#" data-view="me">My stats</a><a href="#team" data-view="team">Team</a></nav>
+  <nav id="tabs" class="tabs" aria-label="View"><a href="#" data-view="me">My stats</a><a href="#team" data-view="team">Team</a></nav>
   <details id="repo" class="picker"><summary class="ctl" aria-label="Pick organization and repository"></summary>
     <div class="menu"><div class="group">Organizations</div><div id="orgs"></div><div class="group">Repositories</div><div id="repos"></div></div></details>
   <div class="spacer"></div>

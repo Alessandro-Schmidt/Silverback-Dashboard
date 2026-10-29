@@ -5,7 +5,7 @@ import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, t
 const rev = (...states) => ({ nodes: states.map((state, i) => ({ state, submittedAt: `2026-10-0${i + 1}T10:00:00Z`, author: { login: "rev" } })) });
 const base = (extra = {}) => ({
   viewer: { login: "me" }, repository: { pullRequests: { totalCount: 0 }, issues: { totalCount: 0 }, stargazerCount: 0 },
-  organization: { viewerCanAdminister: false, repositories: { totalCount: 0, nodes: [] } },
+  organization: { repositories: { totalCount: 0, nodes: [] } },
   myOpen: { nodes: [] }, myMerged: { issueCount: 0 }, myFirst: { nodes: [] }, myIssues: { nodes: [] }, myDevelop: { nodes: [] },
   repoMerged: { nodes: [] }, orgMerged: { nodes: [] }, ...extra,
 });
@@ -14,10 +14,10 @@ test("summarize: repo and org pulse", () => {
   const n = (prs, lang, size = 1) => ({ pullRequests: { totalCount: prs }, languages: { edges: lang ? [{ size, node: { name: lang } }] : [] } });
   const s = summarize(base({
     repository: { pullRequests: { totalCount: 3 }, issues: { totalCount: 5 }, stargazerCount: 7 },
-    organization: { viewerCanAdminister: true, repositories: { totalCount: 4, nodes: [n(1, "Go", 50), n(2, "TS", 10), n(0, "TS", 10), n(4, null)] } },
+    organization: { repositories: { totalCount: 4, nodes: [n(1, "Go", 50), n(2, "TS", 10), n(0, "TS", 10), n(4, null)] } },
     repoMerged: { nodes: [{ reviews: rev("APPROVED") }, { reviews: rev("CHANGES_REQUESTED", "APPROVED") }] },
   }), "a/b", "a");
-  assert.deepEqual([s.prs, s.issues, s.stars, s.orgRepos, s.orgPrs, s.langs, s.owner, s.repoRate.rate, s.orgRate.rate], [3, 5, 7, 4, 7, "Go, TS", true, 50, null]);
+  assert.deepEqual([s.prs, s.issues, s.stars, s.orgRepos, s.orgPrs, s.langs, s.repoRate.rate, s.orgRate.rate], [3, 5, 7, 4, 7, "Go, TS", 50, null]);
 });
 
 test("firstTry: no change request before the first approval", () => {
