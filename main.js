@@ -195,7 +195,7 @@ app.addEventListener("drop", async (e) => {
 });
 
 // Loading keeps the last data on screen (or skeletons when there is none); a failure shows a banner with Retry.
-const skeleton = () => `<div class="sk" style="height:60px;width:320px"></div><div class="stats">${'<div class="sk" style="height:130px"></div>'.repeat(3)}</div>
+const SKELETON = `<div class="sk" style="height:60px;width:320px"></div><div class="stats">${'<div class="sk" style="height:130px"></div>'.repeat(3)}</div>
   <div class="charts">${'<div class="sk" style="height:300px"></div>'.repeat(3)}</div><div class="sk" style="height:320px"></div>`;
 // `quiet` skips the loading overlay (used after moving an issue). One refresh at a time.
 let busy = false;
@@ -208,7 +208,7 @@ async function load(quiet) {
   const [token, repo, org, p] = await Promise.all(["token", "repo", "org", "period"].map(get));
   if (!token || !repo) return;
   $("banner").hidden = true;
-  if (!shown) app.innerHTML = skeleton();
+  if (!shown) app.innerHTML = SKELETON;
   status.textContent = "Refreshing…";
   const finish = quiet === true ? async () => {} : startLoading(repo.split("/")[1]);
   try {

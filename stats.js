@@ -4,10 +4,10 @@ export const QUERY = `query($owner:String!,$name:String!,$org:String!,$qOpen:Str
   viewer{ login avatarUrl }
   repository(owner:$owner,name:$name){ pullRequests(states:OPEN){totalCount} issues(states:OPEN){totalCount} stargazerCount }
   organization(login:$org){ avatarUrl repositories(first:100){ totalCount nodes{ pullRequests(states:OPEN){totalCount} languages(first:10){ edges{ size node{ name } } } } } }
-  myOpen: search(query:$qOpen,type:ISSUE,first:100){ issueCount nodes{ ... on PullRequest { number title url isDraft createdAt headRefName comments{totalCount} } } }
+  myOpen: search(query:$qOpen,type:ISSUE,first:100){ nodes{ ... on PullRequest { number title url isDraft createdAt headRefName comments{totalCount} } } }
   myFirst: search(query:$qFirst,type:ISSUE,first:1){ nodes{ ... on PullRequest { createdAt } ... on Issue { createdAt } } }
   myMerged: search(query:$qMerged,type:ISSUE,first:1){ issueCount }
-  myIssues: search(query:$qIssues,type:ISSUE,first:100){ issueCount nodes{ ... on Issue { number title url createdAt closedByPullRequestsReferences(first:1){ nodes{ number } }
+  myIssues: search(query:$qIssues,type:ISSUE,first:100){ nodes{ ... on Issue { number title url createdAt closedByPullRequestsReferences(first:1){ nodes{ number } }
     projectItems(first:5){ nodes{ id project{ id } fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue{ name optionId field{ ... on ProjectV2SingleSelectField{ id options{ id name } } } } } } } } } }
   myDevelop: search(query:$qDevelop,type:ISSUE,first:100){ nodes{ ... on PullRequest { headRefOid createdAt mergedAt reviews(first:2){ totalCount nodes{ state commit{oid} } } } } }
 }`;
