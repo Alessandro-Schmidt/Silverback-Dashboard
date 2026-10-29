@@ -1,5 +1,5 @@
 import { crest, mark } from "./crest.js";
-import { listOrgs, listRepos, PERIODS, periodOption, sideEye, tier, toNextTier, validPeriod } from "./stats.js";
+import { listOrgs, listRepos, PERIOD_ORDER, periodOption, sideEye, tier, toNextTier, validPeriod } from "./stats.js";
 
 const $ = (id) => document.getElementById(id);
 const form = $("form"), store = chrome.storage.local;
@@ -8,7 +8,7 @@ const options = (sel, values, pick) => {
   sel.innerHTML = values.map((v) => `<option${v === pick ? " selected" : ""}>${esc(v)}</option>`).join("");
   sel.disabled = !values.length;
 };
-$("period").innerHTML = Object.keys(PERIODS).map((v) => `<option value="${v}">${periodOption(v)}</option>`).join("");
+$("period").innerHTML = PERIOD_ORDER.map((v) => `<option value="${v}">${periodOption(v)}</option>`).join("");
 
 function show(setup) {
   $("setup").hidden = !setup;

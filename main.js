@@ -1,7 +1,7 @@
 import { Preferences } from "@capacitor/preferences";
 import { startLoading } from "./loader.js";
 import { crest } from "./crest.js";
-import { fetchStats, listOrgs, listRepos, PERIODS, periodOption, periodLabel, validPeriod, setStatus, tenure, tier, TIERS } from "./stats.js";
+import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, validPeriod, setStatus, tenure, tier, TIERS } from "./stats.js";
 import { renderTeam, loadTeam } from "./team.js";
 
 // Kept in Preferences (Android SharedPreferences "CapacitorStorage"), which the home-screen widget also reads.
@@ -18,7 +18,7 @@ const chevron = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const hidden = (name) => /^(new|done|to test (in|on) uat)$/.test(name.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim());
 const COLUMN_COLORS = ["#8B949E", "#58A6FF", "#E3B341", "#BC8CFF", "#39C5BB", "#F778BA", "#56D364"];
 
-period.innerHTML = Object.keys(PERIODS).map((v) => `<option value="${v}">${periodOption(v)}</option>`).join("");
+period.innerHTML = PERIOD_ORDER.map((v) => `<option value="${v}">${periodOption(v)}</option>`).join("");
 const time = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 // Rate in its tier colour with the tier name in words (never colour alone); "—" and no crest when nothing merged.

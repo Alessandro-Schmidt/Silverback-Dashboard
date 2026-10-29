@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, weeks, periodStart, periodOption, periodLabel, sideEye, summarizeTeam } from "./stats.js";
+import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, weeks, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam } from "./stats.js";
 
 const rev = (...states) => ({ nodes: states.map((state, i) => ({ state, submittedAt: `2026-10-0${i + 1}T10:00:00Z`, author: { login: "rev" } })) });
 const base = (extra = {}) => ({
@@ -42,7 +42,13 @@ test("periods", () => {
   const now = new Date(2026, 9, 29, 15); // Thursday 29 Oct 2026
   assert.deepEqual(["w", "m", "q", "10", "30", "bogus"].map((p) => periodStart(now, p).toDateString()),
     [new Date(2026, 9, 26), new Date(2026, 9, 1), new Date(2026, 9, 1), new Date(2026, 9, 16), new Date(2026, 8, 18), new Date(2026, 8, 18)].map((d) => d.toDateString()));
-  assert.deepEqual([periodOption("q", now), periodLabel("w", now), periodLabel("30", now)], ["This quarter (since 1 Oct)", "this week · since Mon 26/10/2026", "since 18/09/2026"]);
+  assert.deepEqual([periodOption("q", now), periodLabel("w", now), periodLabel("30", now), periodOption("0"), periodLabel("0", now), periodStart(now, "0").getTime()],
+    ["This quarter (since 1 Oct)", "this week · since Mon 26/10/2026", "since 18/09/2026", "Overall", "overall", 0]);
+});
+
+test("period menu lists every period in order", () => {
+  assert.deepEqual([...PERIOD_ORDER].sort(), Object.keys(PERIODS).sort());
+  assert.deepEqual(PERIOD_ORDER.map((p) => PERIODS[p]).at(-1), "Overall");
 });
 
 test("workdaysSince skips weekends", () => {

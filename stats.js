@@ -49,12 +49,15 @@ export function workdaysSince(now, days) {
 }
 
 const monday = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; };
-export const PERIODS = { w: "This week", m: "This month", "10": "Last 10 working days", "30": "Last 30 working days", q: "This quarter" };
+export const PERIODS = { w: "This week", m: "This month", "10": "Last 10 working days", "30": "Last 30 working days", q: "This quarter", "0": "Overall" };
+// Menu order (object keys that look like numbers would otherwise sort first).
+export const PERIOD_ORDER = ["w", "m", "10", "30", "q", "0"];
 export const DEFAULT_PERIOD = "30";
 export const validPeriod = (p) => (p in PERIODS ? p : DEFAULT_PERIOD);
 // Start of a period: this week (Monday), this month, the last 10 or 30 working days, or this calendar quarter.
 export function periodStart(now, period) {
   const d = new Date(now);
+  if (period === "0") return new Date(0); // overall: everything GitHub returns
   if (period === "w") return monday(now);
   if (period === "m") return new Date(d.getFullYear(), d.getMonth(), 1);
   if (period === "q") return new Date(d.getFullYear(), d.getMonth() - (d.getMonth() % 3), 1);
@@ -66,6 +69,7 @@ export const periodOption = (p, now = Date.now()) =>
   p === "q" ? `This quarter (since ${periodStart(now, "q").toLocaleDateString("en-GB", { day: "numeric", month: "short" })})` : PERIODS[p];
 // "this week · since Mon 26/10/2026", "since 18/09/2026", …
 export function periodLabel(p, now = Date.now()) {
+  if (p === "0") return "overall";
   const s = periodStart(now, p);
   return { w: `this week · since Mon ${ddmmyyyy(s)}`, m: `this month · since ${ddmmyyyy(s)}`, q: `this quarter · since ${ddmmyyyy(s)}` }[p] || `since ${ddmmyyyy(s)}`;
 }
