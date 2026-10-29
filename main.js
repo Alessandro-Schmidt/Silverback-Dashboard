@@ -1,30 +1,36 @@
 import { Preferences } from "@capacitor/preferences";
 import { startLoading } from "./loader.js";
-import { fetchStats, listOrgs, listRepos, setStatus, tenure } from "./stats.js";
+import { crest } from "./crest.js";
+import { fetchStats, listOrgs, listRepos, PERIODS, periodOption, periodLabel, validPeriod, setStatus, tenure, tier, TIERS } from "./stats.js";
+import { renderTeam, loadTeam } from "./team.js";
 
 // Kept in Preferences (Android SharedPreferences "CapacitorStorage"), which the home-screen widget also reads.
 const get = async (key) => (await Preferences.get({ key })).value;
 const set = (key, value) => Preferences.set({ key, value });
 const $ = (id) => document.getElementById(id);
-const form = $("cfg"), status = $("status"), app = $("app");
+const form = $("cfg"), status = $("status-text"), app = $("app");
 const repoPicker = $("repo"), tokenPicker = $("token"), period = $("period");
 const esc = (v) => String(v).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-const day = (t) => new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+const day = (t) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 const chevron = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`;
 // Board columns left off the dashboard (their issues are still found by the search).
 // Matched loosely: case, emoji, punctuation and "in"/"on" UAT don't matter.
 const hidden = (name) => /^(new|done|to test (in|on) uat)$/.test(name.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim());
 const COLUMN_COLORS = ["#8B949E", "#58A6FF", "#E3B341", "#BC8CFF", "#39C5BB", "#F778BA", "#56D364"];
 
-const ddmmyyyy = (t) => new Date(t).toLocaleDateString("en-GB");
-period.innerHTML = [["30", "Last 30 working days"], ["10", "Last 10 working days"], ["q", "This quarter"], ["0", "Overall"]]
-  .map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+period.innerHTML = Object.keys(PERIODS).map((v) => `<option value="${v}">${periodOption(v)}</option>`).join("");
+const time = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+// Rate in its tier colour with the tier name in words (never colour alone); "—" and no crest when nothing merged.
+const rateText = (r, size = 18) => r.rate == null ? `<span class="mono muted" style="font-size:${size}px;font-weight:600">—</span>`
+  : `<span class="mono" style="font-size:${size}px;font-weight:600;color:${tier(r.rate).c}">${r.rate}%</span> <span style="font-size:12px;font-weight:700;color:${tier(r.rate).c}">${tier(r.rate).name}</span>`;
+const rankBox = (r) => `<div class="rank">${crest(r.rate, 36)}<div><div class="muted" style="font-size:12px">Silverback rate</div><div>${rateText(r)}</div></div></div>`;
 
 function mergedChart(weeks) {
   const max = Math.max(1, ...weeks.map((w) => w.merged)), h = (n) => `${(n / max) * 140}px`;
-  return `<figure class="card"><figcaption><div style="font-weight:600">Merged PRs per week</div><div class="sub" style="margin-top:2px">Into develop · approved first try vs. needed changes</div></figcaption>
-    <div class="legend"><span><i class="swatch" style="background:var(--accent)"></i>First try</span><span><i class="swatch" style="background:var(--redo)"></i>Needed changes</span></div>
-    <div class="bars">${weeks.map((w) => `<div class="bar" tabindex="0" aria-label="Week of ${day(w.start)}: ${w.merged} merged, ${w.first} approved first try">
+  return `<figure class="card"><figcaption><div style="font-weight:600">Merged PRs per week</div><div class="sub" style="margin-top:2px">Into develop · first try vs. needed changes</div></figcaption>
+    <div class="legend"><span><i class="swatch" style="background:var(--accent)"></i>Silverback (first try)</span><span><i class="swatch" style="background:var(--redo)"></i>Needed changes</span></div>
+    <div class="bars">${weeks.map((w) => `<div class="bar" tabindex="0" aria-label="Week of ${day(w.start)}: ${w.merged} merged, ${w.first} first try">
       <span class="mono" style="font-size:12px;margin-bottom:4px">${w.merged}</span>
       ${w.merged - w.first ? `<div style="height:${h(w.merged - w.first)};background:var(--redo);border-radius:4px 4px 0 0"></div>` : ""}${w.first ? `<div style="height:${h(w.first)};background:var(--accent)${w.merged === w.first ? ";border-radius:4px 4px 0 0" : ""}"></div>` : ""}
       <div class="tip"><div class="muted">Week of ${day(w.start)}</div><div>${w.merged} merged</div><div>${w.first} first try · ${w.merged - w.first} needed changes</div></div></div>`).join("")}</div>
@@ -64,11 +70,14 @@ function agesChart(prs, now) {
 
 function render(s) {
   showRepo(s.repo);
-  if (!("period" in s)) return; // cache from an older version
+  if (!s.mine) return; // cache from an older version
   shown = s;
+  $("tabs").hidden = !s.owner;
+  for (const a of $("tabs").querySelectorAll("a")) a.toggleAttribute("aria-current", a.dataset.view === view());
+  if (view() === "team") return route();
   const repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
   const drafts = s.myOpen.filter((p) => p.draft).length, open = s.myOpen.length - drafts;
-  const first = s.myOneShot, base = s.myDevelopCount, pct = base ? Math.round((first / base) * 100) : 0;
+  const r = s.mine, t = tier(r.rate);
   // Every board column, empty ones too, so issues can be dropped anywhere.
   // ponytail: columns come from the first issue's board; issues on other boards only show if their status name matches.
   const options = s.myIssues.find((i) => i.move)?.move.options || [];
@@ -79,17 +88,21 @@ function render(s) {
   app.innerHTML = `
   <div class="hello">${s.meAvatar ? `<img src="${esc(s.meAvatar)}" alt="">` : ""}<div>
     <h1>${esc(s.me || "Me")}</h1>
-    <p class="muted" style="margin:4px 0 0">Your activity on ${repoName}${s.since || s.firstInOrg ? ` since ${ddmmyyyy(s.since || s.firstInOrg)}` : ""}${s.firstInOrg ? ` · ${tenure(s.firstInOrg, s.at)} at ${org}` : ""}</p>
+    <p class="muted" style="margin:4px 0 0">Your activity on ${repoName} ${periodLabel(s.period, s.at)}${s.firstInOrg ? ` · ${tenure(s.firstInOrg, s.at)} at ${org}` : ""}</p>
   </div>${s.orgLogo ? `<img class="org-logo" src="${esc(s.orgLogo)}" alt="${org} logo" title="${org}">` : ""}</div>
 
   <section class="stats" aria-label="Your stats">
     <div class="card wide">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+      <div class="rate-head">
         <div><div class="label">Merged PRs</div><div class="mono" style="font-size:44px;font-weight:600;line-height:1.1;margin-top:4px">${s.myMerged}</div></div>
-        <div style="text-align:right"><div class="label">Approved first try</div>
-          <div style="margin-top:4px"><span class="mono" style="font-size:28px;font-weight:600">${first}</span><span class="muted"> / ${base} · ${pct}%</span></div></div>
+        <div class="rate">${crest(r.rate, 58)}<div>
+          <div class="label">Silverback rate</div>
+          <div style="margin-top:2px;display:flex;align-items:baseline;gap:8px">${rateText(r, 30)}</div>
+          <div class="sub" style="margin-top:0">${r.total ? `${r.first} of ${r.total} approved on the first review` : "Nothing merged into develop in this period"}</div></div></div>
       </div>
-      <div class="meter" role="img" aria-label="${pct}% of PRs merged into develop approved on first review"><div style="width:${pct}%"></div></div>
+      <div><div class="tierbar" role="img" aria-label="${r.rate == null ? "No Silverback rate yet" : `Silverback rate ${r.rate}%, ${t.name}`}. Tiers start at 30, 60 and 90 percent.">
+          <div style="width:${r.rate ?? 0}%;background:${t ? t.c : "transparent"}"></div><i style="left:30%"></i><i style="left:60%"></i><i style="left:90%"></i></div>
+        <div class="tiers">${[...TIERS].reverse().map((x) => `<span>${x.min === 90 ? "King" : x.name}</span>`).join("")}</div></div>
     </div>
     <div class="card"><div class="label">Open PRs</div><div class="mono big">${open}</div><div class="sub">+ ${drafts} draft${drafts === 1 ? "" : "s"}</div></div>
     <div class="card"><div class="label">Issues assigned</div><div class="mono big">${s.myIssues.length}</div><div class="sub">${s.newIssues} new ${s.since ? "this period" : "overall"}</div></div>
@@ -119,6 +132,7 @@ function render(s) {
           <div><div class="mono">${s.prs}</div><div class="muted">Open PRs</div></div>
           <div><div class="mono">${s.issues}</div><div class="muted">Open issues</div></div>
           <div><div class="mono">${s.stars}</div><div class="muted">Star${s.stars === 1 ? "" : "s"}</div></div></div>
+        ${rankBox(s.repoRate)}
         <div class="sub" style="margin-top:16px">Your share of open PRs</div>
         <div class="meter" style="height:6px;margin-top:6px" role="img" aria-label="${s.myOpen.length} of ${s.prs} open PRs are yours"><div style="width:${s.prs ? (s.myOpen.length / s.prs) * 100 : 0}%"></div></div>
         <div style="margin-top:6px;font-size:12px"><span class="mono">${s.myOpen.length}</span><span class="muted"> of ${s.prs} incl. drafts</span></div>
@@ -127,6 +141,7 @@ function render(s) {
         <div class="mini" style="grid-template-columns:repeat(2,minmax(0,1fr))">
           <div><div class="mono">${s.orgRepos}</div><div class="muted">Repositories</div></div>
           <div><div class="mono">${s.orgPrs}</div><div class="muted">Open PRs</div></div></div>
+        ${rankBox(s.orgRate)}
         <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px">${(s.langs ? s.langs.split(", ") : []).map((l) => `<span class="chip">${esc(l)}</span>`).join("")}</div>
       </section>
     </aside>
@@ -197,9 +212,16 @@ app.addEventListener("drop", async (e) => {
 // Loading keeps the last data on screen (or skeletons when there is none); a failure shows a banner with Retry.
 const SKELETON = `<div class="sk" style="height:60px;width:320px"></div><div class="stats">${'<div class="sk" style="height:130px"></div>'.repeat(3)}</div>
   <div class="charts">${'<div class="sk" style="height:300px"></div>'.repeat(3)}</div><div class="sk" style="height:320px"></div>`;
-// The loading overlay only shows for a new context: connecting a token, switching organization or repo.
-// Page loads, the refresh button, period changes and issue moves refresh silently. One refresh at a time.
+// Two loading states. A new context (connecting a token, switching organization or repo) gets the full overlay.
+// Everything else (page load, refresh button, period change, issue moves) gets the light one: the page stays,
+// dimmed, with "Updating…", a spinning refresh icon and a thin bar under the top bar. One refresh at a time.
 let busy = false;
+function setBusy(on) {
+  document.body.classList.toggle("busy", on);
+  app.setAttribute("aria-busy", String(on));
+  $("refresh").disabled = on;
+  if (on) status.textContent = "Updating…";
+}
 async function refresh(animate) {
   if (busy) return;
   busy = true;
@@ -210,22 +232,47 @@ async function load(animate) {
   if (!token || !repo) return;
   $("banner").hidden = true;
   if (!shown) app.innerHTML = SKELETON;
-  status.textContent = "Refreshing…";
   const finish = animate === true ? startLoading(repo.split("/")[1]) : async () => {};
+  if (animate !== true) setBusy(true);
   try {
-    const s = await fetchStats(token, repo, org, p || "30");
+    const s = await fetchStats(token, repo, org, validPeriod(p));
     await set("stats", JSON.stringify(s));
     render(s);
-    status.textContent = `Updated ${new Date(s.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    if (view() === "team" && s.owner) await loadTeam(token, s);
+    status.textContent = `Updated ${time(s.at)}`;
     await finish(true);
   } catch (e) {
     await finish(false);
     $("banner-text").textContent = `Couldn't reach GitHub (${e.message}).${shown ? " Showing the last data." : ""}`;
     $("banner").hidden = false;
-    status.textContent = shown ? `Updated ${new Date(shown.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "";
+    status.textContent = shown ? `Updated ${time(shown.at)}` : "";
     if (!shown) app.innerHTML = "";
+  } finally {
+    setBusy(false);
   }
 }
+
+// Views: My stats (#) and Team (#team). Team only exists for organization owners; anyone else gets a 404.
+const view = () => (location.hash === "#team" ? "team" : "me");
+function route() {
+  for (const a of $("tabs").querySelectorAll("a")) a.toggleAttribute("aria-current", a.dataset.view === view());
+  if (!shown) return;
+  if (view() === "me") return render(shown);
+  if (!shown.owner) {
+    app.innerHTML = `<div class="notfound"><h1 style="font-size:40px">404</h1><p class="muted">This page doesn't exist, or only organization owners can see it.</p><a href="#" style="color:var(--link)">Back to my stats</a></div>`;
+    return;
+  }
+  renderTeam(app, shown);
+}
+window.addEventListener("hashchange", async () => {
+  route();
+  if (view() === "team" && shown?.owner && !busy) {
+    busy = true; setBusy(true);
+    try { await loadTeam(await get("token"), shown); } catch (e) { $("banner-text").textContent = `Couldn't load the team (${e.message}).`; $("banner").hidden = false; }
+    finally { busy = false; setBusy(false); }
+  }
+});
+
 $("retry").addEventListener("click", () => refresh());
 
 const showRepo = (r = "") => {
@@ -296,7 +343,7 @@ for (const f of [form, $("welcome-form")]) f.addEventListener("submit", async (e
 
 const cached = await get("stats");
 if (cached) render(JSON.parse(cached));
-period.value = (await get("period")) || "30";
+period.value = validPeriod(await get("period"));
 showToken(!!(await get("token")));
 if (!(await get("token"))) document.body.classList.add("first-run");
 await loadPickers();

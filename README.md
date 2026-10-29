@@ -10,6 +10,17 @@ There is no backend and no database. The app calls the GitHub GraphQL API straig
 token (`stats.js`). It keeps the last values on the device, so the dashboard and widgets still show something
 when you're offline. Nothing is collected or processed on our side.
 
+## Silverback rate
+
+The key metric: the share of your PRs merged into `develop` in the period that were approved on the first review
+(no "changes requested" before the first approval). It comes with a tier and a crest badge:
+**Code Monkey** (0–29%), **Merge Chimp** (30–59%), **Silverback** (60–89%) and **King of the Repo** (90–100%).
+It's shown for you, for the repository (all authors) and for the whole organization.
+
+The period select (this week, this month, the last 10 or 30 working days, this quarter) drives every number;
+the trend charts always show the last 6 weeks. Organization owners also get a **Team** tab: the team's rate,
+merged PRs, cycle time, review balance, things that need attention, and a sortable members table.
+
 ## Run it
 
 ```bash
@@ -49,7 +60,13 @@ npm run build:extension
 
 Then open `edge://extensions` (or `chrome://extensions`), turn on **Developer mode**, click **Load unpacked**
 and pick the `dist-extension/` folder. Click the Silverback icon, paste your token, and pick the organization,
-repository and period. The code is in `extension/`.
+repository. The popup shows your Silverback rate and crest, your stats, and a "Side-eye" list of what's waiting
+on you; the toolbar icon wears your tier's crest and counts the PRs waiting on you. The code is in `extension/`.
+
+## GitHub Pages
+
+`.github/workflows/pages.yml` builds the app and publishes `dist/` on every push to `main`. In the repository's
+**Settings › Pages**, the source must be **GitHub Actions**.
 
 ## Not built yet
 

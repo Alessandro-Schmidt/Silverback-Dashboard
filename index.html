@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Silverback</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0D1117">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
 <style>
   :root { --bg: #0D1117; --card: #161B22; --well: #11161D; --line: #21262D; --edge: #30363D; --fg: #E6EDF3; --muted: #9AA4B2; --dim: #6E7681;
@@ -139,6 +142,51 @@
   #issue-search { width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 12px; margin-bottom: 14px; background: var(--card); border: 1px solid var(--edge); border-radius: 8px; }
   .results { display: grid; gap: 8px; margin-bottom: 14px; }
   .results .issue { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+
+  /* Tabs: My stats | Team (owners only) */
+  .tabs { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--edge); border-radius: 10px; padding: 3px; }
+  .tabs a { display: flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .tabs a:hover { color: var(--fg); text-decoration: none; } .tabs a[aria-current] { background: var(--line); color: var(--fg); }
+
+  /* Light refresh (refresh button, period change): page stays readable */
+  @keyframes sb-slide { 0% { transform: translateX(-100%) } 100% { transform: translateX(250%) } }
+  @keyframes sb-spin { to { transform: rotate(360deg) } }
+  @keyframes sb-thump { 0%,100% { transform: scale(1) } 10% { transform: scale(1.18) } 20% { transform: scale(1) } 30% { transform: scale(1.22) } 42% { transform: scale(1) } }
+  header { position: relative; }
+  .runner { position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; overflow: hidden; background: #172A4A; display: none; }
+  .runner div { position: absolute; top: 0; bottom: 0; width: 40%; background: var(--accent); border-radius: 999px; animation: sb-slide 1.1s ease-in-out infinite; }
+  #status { display: flex; align-items: center; gap: 8px; min-width: 112px; justify-content: flex-end; }
+  #status .sb-thump { display: none; animation: sb-thump 1.2s ease-in-out infinite; transform-origin: 50% 50%; }
+  body.busy .runner { display: block; } body.busy #status { color: var(--fg); } body.busy #status .sb-thump { display: block; }
+  body.busy #refresh svg { animation: sb-spin .9s linear infinite; } #refresh:disabled { cursor: progress; }
+  #app { transition: opacity .25s ease; } body.busy #app { opacity: .55; }
+  @media (prefers-reduced-motion: reduce) { .runner div { animation: none; left: 0; width: 100%; opacity: .6; } body.busy #refresh svg, #status .sb-thump { animation: none; } }
+
+  /* Silverback rate */
+  .crest { display: block; flex: none; }
+  .rate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .rate { display: flex; align-items: center; gap: 14px; }
+  .tierbar { position: relative; height: 8px; border-radius: 999px; background: var(--line); }
+  .tierbar > div { height: 100%; border-radius: 999px; }
+  .tierbar i { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--card); }
+  .tiers { display: grid; grid-template-columns: 30fr 30fr 30fr 10fr; font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .rank { margin-top: 16px; display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--well); border: 1px solid var(--line); border-radius: 10px; }
+
+  /* Team view */
+  .owner-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #2B2112; color: #E3B341; white-space: nowrap; }
+  .you-chip { background: #172A4A; color: var(--link); }
+  .team-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+  .team-stats .rankcard { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+  .team-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 16px; align-items: start; }
+  .alert { display: flex; gap: 12px; align-items: flex-start; padding: 12px; background: var(--well); border: 1px solid var(--line); border-radius: 8px; }
+  .av { width: 36px; height: 36px; border-radius: 999px; flex: none; background: var(--line); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: var(--bg); object-fit: cover; }
+  .members { display: grid; grid-template-columns: minmax(240px, 2.2fr) repeat(5, minmax(96px, 1fr)) 120px; gap: 12px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #1C222B; min-width: 980px; box-sizing: border-box; }
+  .members.headrow { padding-top: 6px; padding-bottom: 6px; border-bottom-color: var(--line); }
+  .members:not(.headrow):hover { background: #1A2029; }
+  .sortbtn { background: none; border: 0; padding: 6px 0; color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; min-height: 32px; }
+  .sortbtn:hover, .sortbtn.on { color: var(--fg); }
+  #member-search { min-height: 36px; width: 220px; max-width: 100%; padding: 0 12px; background: var(--bg); border: 1px solid var(--edge); border-radius: 8px; font-size: 13px; }
+  .notfound { text-align: center; padding: 80px 0; }
 </style>
 </head>
 <body>
@@ -148,11 +196,12 @@
     <span><b>Silverback</b><small>Ship like you mean it.</small></span>
   </a>
   <span class="divider" aria-hidden="true"></span>
+  <nav id="tabs" class="tabs" aria-label="View" hidden><a href="#" data-view="me">My stats</a><a href="#team" data-view="team">Team</a></nav>
   <details id="repo" class="picker"><summary class="ctl" aria-label="Pick organization and repository"></summary>
     <div class="menu"><div class="group">Organizations</div><div id="orgs"></div><div class="group">Repositories</div><div id="repos"></div></div></details>
   <div class="spacer"></div>
   <select id="period" class="ctl" aria-label="Period"></select>
-  <span id="status"></span>
+  <span id="status" role="status"><img class="sb-thump" src="/favicon.svg" width="18" height="18" alt=""><span id="status-text"></span></span>
   <button id="refresh" type="button" class="ctl" aria-label="Refresh data"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
   <details id="token" class="picker"><summary class="ctl"><span class="dot"></span><span id="tokenlabel">Connect GitHub token</span></summary>
     <form id="cfg" class="menu">
@@ -161,7 +210,7 @@
       <button>Save token</button>
     </form>
   </details>
-</div></header>
+</div><div class="runner" aria-hidden="true"><div></div></div></header>
 <div id="banner" class="banner" role="alert" hidden><div class="wrap"><span id="banner-text"></span><button id="retry" type="button" class="ctl">Retry</button></div></div>
 <main id="app" class="wrap">
   <section class="welcome" aria-labelledby="welcome-title">
