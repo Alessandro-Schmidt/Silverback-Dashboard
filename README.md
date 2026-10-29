@@ -1,10 +1,16 @@
-# Silverback
+![Silverback. Your GitHub stats, but with an ego. Ship like you mean it.](docs/banner.png)
 
-*Ship like you mean it.*
+# Silverback
 
 A personal productivity dashboard on top of GitHub: the PRs you opened and merged, how many were approved on
 the first review, how long they waited, your 6-week trends, and your assigned issues on a board you can drag
 to change their status. Plus repo and organization pulse, and Android home-screen widgets.
+
+Issue cards show an **Epic** tag (GitHub issue type or `epic` label) and how many subtasks are done. Click a PR
+or an issue to open its details in a side panel, loaded from GitHub when it opens: checks, size, reviews and
+where it stands for your Silverback rate for a PR; status, labels, subtasks, description, linked PR and recent
+activity for an issue. Drag the panel's left edge to resize it (it opens at a third of the screen and remembers
+your width). Ctrl/Cmd-click still opens GitHub in a new tab.
 
 There is no backend and no database. The app calls the GitHub GraphQL API straight from your device with your
 token (`stats.js`). It keeps the last values on the device, so the dashboard and widgets still show something
@@ -17,7 +23,7 @@ The key metric: the share of your PRs merged into `develop` in the period that w
 **Code Monkey** (0–29%), **Merge Chimp** (30–59%), **Silverback** (60–89%) and **King of the Repo** (90–100%).
 It's shown for you, for the repository (all authors) and for the whole organization.
 
-The period select (this week, this month, the last 10 or 30 working days, this quarter) drives every number;
+The period select (this week, this month, the last 10 or 30 working days, this quarter, overall) drives every number;
 the charts follow it too, one point per day (up to 2 weeks), per week (up to 24 weeks) or per month. The **Team** tab, open to everyone, shows: the team's rate,
 merged PRs, cycle time, review balance, things that need attention, and a sortable members table.
 
