@@ -193,6 +193,32 @@ export const setStatus = (token, { project, item, field }, optionId) =>
   gql(token, `mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){ updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){ clientMutationId } }`,
     { p: project, i: item, f: field, o: optionId });
 
+// Everything the details drawer shows, fetched when it opens: kind is "pr" or "issue".
+const DETAIL = {
+  pr: `pullRequest(number:$n){ number title url isDraft createdAt headRefName baseRefName additions deletions changedFiles comments{totalCount}
+    reviews(first:50){ nodes{ state submittedAt author{ login } } } reviewRequests(first:10){ nodes{ requestedReviewer{ ... on User{ login } } } }
+    commits(last:1){ nodes{ commit{ statusCheckRollup{ state } } } } closingIssuesReferences(first:1){ nodes{ number title } } }`,
+  issue: `issue(number:$n){ number title url createdAt bodyHTML issueType{ name } labels(first:10){ nodes{ name color } } assignees(first:5){ nodes{ login } }
+    subIssues(first:30){ nodes{ number title state } } closedByPullRequestsReferences(first:1){ nodes{ number title isDraft } }
+    timelineItems(last:6,itemTypes:[ASSIGNED_EVENT,LABELED_EVENT,ISSUE_COMMENT,CROSS_REFERENCED_EVENT,RENAMED_TITLE_EVENT]){ nodes{ __typename
+      ... on AssignedEvent{ createdAt actor{ login } } ... on LabeledEvent{ createdAt actor{ login } label{ name } } ... on IssueComment{ createdAt author{ login } }
+      ... on CrossReferencedEvent{ createdAt actor{ login } } ... on RenamedTitleEvent{ createdAt actor{ login } } } } }`,
+};
+export const fetchDetail = async (token, repo, kind, n) => {
+  const [owner, name] = repo.split("/");
+  const data = await gql(token, `query($o:String!,$r:String!,$n:Int!){ repository(owner:$o,name:$r){ ${DETAIL[kind]} } }`, { o: owner, r: name, n: Number(n) });
+  return data.repository[kind === "pr" ? "pullRequest" : "issue"];
+};
+
+// Where a PR stands for the Silverback rate, from its reviews: [title, hint, colour].
+export function outlook(pr) {
+  const states = pr.reviews.nodes.map((r) => r.state);
+  if (pr.isDraft) return ["Draft · not in review yet", "Mark it ready; it can still be a first try.", "#9AA4B2"];
+  if (states.includes("CHANGES_REQUESTED")) return ["Changes requested", "Won’t count as a first try when merged.", "#D07A2A"];
+  if (firstTry(pr)) return ["Approved on first review", "Counts toward your Silverback rate once merged.", "#56D364"];
+  return ["Waiting for first review", "Still on track for a first try.", "#4C8DFF"];
+}
+
 // Choices for the pickers: the token owner's organizations, then that organization's repos.
 export const listOrgs = async (token) =>
   (await gql(token, "{viewer{organizations(first:100){nodes{login avatarUrl}}}}")).viewer.organizations.nodes;

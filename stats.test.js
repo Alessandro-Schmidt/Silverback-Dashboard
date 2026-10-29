@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, series, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam } from "./extension/lib/stats.js";
+import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, series, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam, outlook } from "./extension/lib/stats.js";
 
 const rev = (...states) => ({ nodes: states.map((state, i) => ({ state, submittedAt: `2026-10-0${i + 1}T10:00:00Z`, author: { login: "rev" } })) });
 const base = (extra = {}) => ({
@@ -111,4 +111,12 @@ test("lines added and removed by your merged PRs in the period", () => {
     { createdAt: ago(9), mergedAt: ago(1), additions: 5, deletions: 70, reviews: rev("APPROVED") },
     { createdAt: ago(200), mergedAt: ago(190), additions: 999, deletions: 999, reviews: rev("APPROVED") } ] } }), "a/b", "a", "30", now);
   assert.deepEqual(s.lines, { added: 125, removed: 100 });
+});
+
+test("outlook: where an open PR stands for the Silverback rate", () => {
+  const o = (isDraft, ...s) => outlook({ isDraft, reviews: rev(...s) })[0];
+  assert.equal(o(true, "APPROVED"), "Draft · not in review yet");
+  assert.equal(o(false, "CHANGES_REQUESTED", "APPROVED"), "Changes requested");
+  assert.equal(o(false, "COMMENTED", "APPROVED"), "Approved on first review");
+  assert.equal(o(false), "Waiting for first review");
 });

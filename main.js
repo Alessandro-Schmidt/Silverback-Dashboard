@@ -1,7 +1,7 @@
 import { Preferences } from "@capacitor/preferences";
 import { startLoading } from "./loader.js";
 import { crest, explainer, rateChart } from "./extension/lib/crest.js";
-import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, pointLabel, tick, validPeriod, DEFAULT_PERIOD, setStatus, tenure, tier, TIERS } from "./extension/lib/stats.js";
+import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, pointLabel, tick, validPeriod, DEFAULT_PERIOD, setStatus, fetchDetail, outlook, tenure, tier, TIERS } from "./extension/lib/stats.js";
 import { renderTeam, loadTeam, rankCard } from "./team.js";
 import "./tooltip.js";
 
@@ -133,7 +133,7 @@ function render(s) {
       <div style="overflow-x:auto">${[...s.myOpen].reverse().map((p) => `<div class="prrow">
         <span class="chip${p.draft ? "" : " open"}" style="width:52px;justify-content:center">${p.draft ? "Draft" : "Open"}</span>
         <span class="mono muted" style="font-size:13px;width:48px">#${p.num}</span>
-        <a href="${esc(p.url)}" target="_blank" rel="noopener" title="${esc(p.title)}">${esc(p.title)}</a>
+        <a href="${esc(p.url)}" target="_blank" rel="noopener" title="${esc(p.title)}" data-detail="pr:${p.num}">${esc(p.title)}</a>
         ${p.type ? `<span class="mono tag">${esc(p.type)}</span>` : ""}
         <span class="muted" style="display:flex;align-items:center;gap:4px;font-size:12px;width:32px;justify-content:flex-end" aria-label="${p.comments} comments">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${p.comments}</span>
@@ -166,7 +166,7 @@ function render(s) {
     <div id="issue-results" class="results" hidden></div>
     <div class="board">${cols.map((c, n) => `<div class="col"${c.id ? ` data-option="${esc(c.id)}"` : ""}>
       <div class="col-head"><span class="dot" style="background:${c.label === "No status" ? "var(--dim)" : COLUMN_COLORS[n % COLUMN_COLORS.length]}"></span>${esc(c.label)}<span class="mono muted" style="margin-left:auto;font-size:12px">${c.items.length}</span></div>
-      ${c.items.map((i) => `<div class="issue"${i.move ? ` draggable="true" data-issue="${s.myIssues.indexOf(i)}"` : ""}><a href="${esc(i.url)}" target="_blank" rel="noopener" draggable="false"><span class="mono muted">#${i.num}</span> ${esc(i.title)}</a>
+      ${c.items.map((i) => `<div class="issue"${i.move ? ` draggable="true" data-issue="${s.myIssues.indexOf(i)}"` : ""}><a href="${esc(i.url)}" target="_blank" rel="noopener" draggable="false" data-detail="issue:${i.num}"><span class="mono muted">#${i.num}</span> ${esc(i.title)}</a>
         ${i.epic ? `<span class="mono tag">Epic</span>` : ""}${i.subs ? `<span class="mono tag">${i.subsDone}/${i.subs} subtasks</span>` : ""}${i.pr ? `<span class="mono tag">PR #${i.pr}</span>` : ""}</div>`).join("")}
     </div>`).join("") || `<p class="muted">No open issues assigned to you.</p>`}</div>
   </section>`;
@@ -179,7 +179,7 @@ app.addEventListener("input", (e) => {
   box.hidden = !q;
   if (!q) return;
   const hits = shown.myIssues.filter((i) => String(i.num).startsWith(q) || i.title.toLowerCase().includes(q));
-  box.innerHTML = hits.map((i) => `<a class="issue" href="${esc(i.url)}" target="_blank" rel="noopener">
+  box.innerHTML = hits.map((i) => `<a class="issue" href="${esc(i.url)}" target="_blank" rel="noopener" data-detail="issue:${i.num}">
     <span><span class="mono muted">#${i.num}</span> ${esc(i.title)}</span><span class="chip">${esc(i.status)}</span></a>`).join("") || `<p class="muted">No issue matches.</p>`;
 });
 
@@ -365,3 +365,93 @@ showToken(!!(await get("token")));
 if (!(await get("token"))) document.body.classList.add("first-run");
 await loadPickers();
 refresh();
+
+// Details drawer: clicking a PR or issue title opens it here (Ctrl/Cmd-click still opens GitHub in a new tab).
+const drawer = $("drawer");
+const ago = (t) => { const d = Math.floor((Date.now() - new Date(t)) / 864e5); return d ? `${d} d ago` : "today"; };
+const section = (title, html) => `<section><h3>${title}</h3>${html}</section>`;
+const CHECKS = { SUCCESS: ["Passing", "var(--ok)"], FAILURE: ["Failing", "#F85149"], ERROR: ["Failing", "#F85149"], PENDING: ["Running", "#E3B341"], EXPECTED: ["Running", "#E3B341"] };
+const REVIEW = { APPROVED: ["Approved", "var(--ok)"], CHANGES_REQUESTED: ["Changes requested", "var(--redo)"], COMMENTED: ["Commented", "var(--muted)"], PENDING: ["Review requested", "var(--muted)"] };
+const EVENT = { AssignedEvent: "Assigned", LabeledEvent: "Labeled", IssueComment: "Commented", CrossReferencedEvent: "Mentioned elsewhere", RenamedTitleEvent: "Renamed" };
+const linkBtn = (key, ref, title) => `<button type="button" class="dlink" data-detail="${key}"><span class="mono muted" style="font-size:12px">${ref}</span><span>${esc(title)}</span></button>`;
+
+function prBody(p) {
+  const [outT, outS, outC] = outlook(p), tot = p.additions + p.deletions || 1;
+  const [chk, chkC] = CHECKS[p.commits.nodes[0]?.commit.statusCheckRollup?.state] || ["None", "var(--muted)"];
+  // Latest review per person, then anyone still asked to review.
+  const last = {};
+  for (const r of p.reviews.nodes) if (r.author) last[r.author.login] = r.state;
+  for (const r of p.reviewRequests.nodes) if (r.requestedReviewer?.login) last[r.requestedReviewer.login] = "PENDING";
+  const reviewers = Object.entries(last), issue = p.closingIssuesReferences.nodes[0];
+  const stat = (v, label, color = "inherit") => `<div class="well"><div class="mono" style="font-size:18px;font-weight:600;color:${color}">${v}</div><div class="muted" style="font-size:11px">${label}</div></div>`;
+  return `<div class="mono" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px">
+      <span style="background:#172A4A;color:var(--link);border-radius:6px;padding:3px 8px">${esc(p.headRefName)}</span><span class="muted">→</span>
+      <span style="background:var(--line);border-radius:6px;padding:3px 8px">${esc(p.baseRefName)}</span></div>
+    <div class="well"><div style="font-weight:700;color:${outC}">${outT}</div><div class="sub" style="margin-top:2px">${outS}</div></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${stat(`${Math.floor((Date.now() - new Date(p.createdAt)) / 864e5)} d`, "Open for")}${stat(p.comments.totalCount, "Comments")}${stat(chk, "Checks", chkC)}</div>
+    ${section(`Changes · size ${tot < 50 ? "S" : tot < 200 ? "M" : "L"}`, `<div style="display:flex;gap:12px;font-size:13px;margin-bottom:8px"><span class="mono" style="color:var(--ok)">+${p.additions}</span><span class="mono" style="color:#F85149">−${p.deletions}</span><span class="muted">${p.changedFiles} files</span></div>
+      <div style="display:flex;gap:2px;height:8px" role="img" aria-label="${p.additions} lines added, ${p.deletions} removed"><div style="width:${(p.additions / tot) * 100}%;background:var(--ok);border-radius:4px 0 0 4px"></div><div style="width:${(p.deletions / tot) * 100}%;background:#F85149;border-radius:0 4px 4px 0"></div></div>`)}
+    ${section("Reviews", reviewers.map(([who, st]) => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="font-weight:600">${esc(who)}</span><span style="margin-left:auto;font-size:12px;font-weight:600;color:${REVIEW[st]?.[1] || "var(--muted)"}">${REVIEW[st]?.[0] || esc(st)}</span></div>`).join("")
+      || `<div class="muted" style="font-size:13px">${p.isDraft ? "No reviewers yet: it’s a draft." : "No reviewer assigned. Ask someone from the troop."}</div>`)}
+    ${issue ? section("Linked issue", linkBtn(`issue:${issue.number}`, `#${issue.number}`, issue.title)) : ""}`;
+}
+
+function issueBody(i, status) {
+  const pr = i.closedByPullRequestsReferences.nodes[0], subs = i.subIssues.nodes;
+  return `<div class="facts">
+      <span class="muted">Status</span><span>${esc(status || "No status")}</span>
+      <span class="muted">Type</span><span>${esc(i.issueType?.name || "—")}</span>
+      <span class="muted">Assignees</span><span>${i.assignees.nodes.map((a) => esc(a.login)).join(", ") || "—"}</span>
+      <span class="muted">Labels</span><span style="display:flex;flex-wrap:wrap;gap:6px">${i.labels.nodes.map((l) => `<span class="chip" style="background:#${l.color}33;color:#${l.color}">${esc(l.name)}</span>`).join("") || "—"}</span>
+      <span class="muted">Opened</span><span>${ago(i.createdAt)}</span></div>
+    ${subs.length ? section(`Subtasks · ${subs.filter((s) => s.state === "CLOSED").length}/${subs.length} done`,
+      `<div style="display:flex;flex-direction:column;gap:6px">${subs.map((s) => linkBtn(`issue:${s.number}`, `#${s.number} · ${s.state === "CLOSED" ? "Done" : "Open"}`, s.title)).join("")}</div>`) : ""}
+    ${section("Description", `<div class="well md">${i.bodyHTML || `<span class="muted">No description.</span>`}</div>`)}
+    ${pr ? section("Linked pull request", linkBtn(`pr:${pr.number}`, `#${pr.number} · ${pr.isDraft ? "Draft" : "Open"}`, pr.title)) : ""}
+    ${section("Activity", [...i.timelineItems.nodes].reverse().map((e) => `<div style="font-size:13px;margin-bottom:6px">${EVENT[e.__typename]}${e.label ? ` ${esc(e.label.name)}` : ""}${(e.actor || e.author) ? ` by ${esc((e.actor || e.author).login)}` : ""} <span class="muted">· ${ago(e.createdAt)}</span></div>`).join("")
+      + `<div style="font-size:13px">Opened <span class="muted">· ${ago(i.createdAt)}</span></div>`)}`;
+}
+
+const drawerHtml = (chip, ref, title, sub, url) => `<button type="button" class="scrim" aria-label="Close details" data-close tabindex="-1"></button>
+  <aside role="dialog" aria-modal="true" aria-labelledby="dtitle"><header><div style="display:flex;align-items:center;gap:8px">${chip}<span class="mono muted" style="font-size:13px">${ref}</span>
+    <button type="button" class="dbtn" id="dclose" data-close aria-label="Close" style="margin-left:auto;width:40px;justify-content:center;padding:0">✕</button></div>
+    <h2 id="dtitle">${esc(title)}</h2><div class="sub" style="margin:0">${sub}</div></header>
+  <div class="body" id="dbody"><div class="sk" style="height:80px"></div><div class="sk" style="height:160px"></div></div>
+  <footer>${url ? `<a class="dbtn primary" href="${esc(url)}" target="_blank" rel="noopener">Open on GitHub ↗</a><button type="button" class="dbtn" data-copy="${esc(url)}">Copy link</button>` : ""}</footer></aside>`;
+
+let opener, opening = 0;
+async function openDetail(key) {
+  const [kind, n] = key.split(":"), ref = `${kind === "pr" ? "PR" : "Issue"} #${n}`, run = ++opening;
+  const mine = kind === "issue" ? shown?.myIssues.find((i) => String(i.num) === n) : shown?.myOpen.find((p) => String(p.num) === n);
+  if (drawer.hidden) opener = document.activeElement;
+  drawer.innerHTML = drawerHtml("", ref, mine?.title || "Loading…", "", mine?.url);
+  drawer.hidden = false;
+  $("dclose").focus();
+  try {
+    const d = await fetchDetail(await get("token"), shown.repo, kind, n);
+    if (run !== opening || drawer.hidden) return; // closed or another item opened meanwhile
+    const epic = kind === "issue" && (/^epic$/i.test(d.issueType?.name) || d.labels.nodes.some((l) => /^epic$/i.test(l.name)));
+    const chip = kind === "pr" ? `<span class="chip${d.isDraft ? "" : " open"}">${d.isDraft ? "Draft" : "Open"}</span>`
+      : `<span class="chip">${esc(mine?.status || "Issue")}</span>${epic ? `<span class="mono tag" style="align-self:auto">Epic</span>` : ""}`;
+    drawer.innerHTML = drawerHtml(chip, ref, d.title, `Opened ${ago(d.createdAt)} · ${esc(shown.repo)}`, d.url);
+    $("dbody").innerHTML = kind === "pr" ? prBody(d) : issueBody(d, mine?.status);
+    $("dclose").focus();
+  } catch (e) {
+    if (run === opening && !drawer.hidden) $("dbody").innerHTML = `<p class="muted">Couldn't load the details (${esc(e.message)}).</p>`;
+  }
+}
+function closeDetail() {
+  drawer.hidden = true;
+  drawer.innerHTML = "";
+  opener?.focus?.();
+  opener = null;
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest?.("[data-detail],[data-close],[data-copy]");
+  if (!t || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  e.preventDefault();
+  if (t.dataset.close != null) return closeDetail();
+  if (t.dataset.copy) { navigator.clipboard?.writeText(t.dataset.copy); t.textContent = "Copied"; return; }
+  openDetail(t.dataset.detail);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !drawer.hidden) closeDetail(); });
