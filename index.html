@@ -176,6 +176,8 @@
   .owner-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #2B2112; color: #E3B341; white-space: nowrap; }
   .you-chip { background: #172A4A; color: var(--link); }
   .team-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .rankcards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .rankcards { grid-template-columns: 1fr; } }
   .rankcard { display: flex; align-items: center; gap: 24px; padding: 22px 28px; }
   /* Review balance and merged-per-week get the room; all three cards share one height */
   .team-charts { display: grid; grid-template-columns: 1.4fr 1.4fr 1fr; gap: 16px; align-items: stretch; }

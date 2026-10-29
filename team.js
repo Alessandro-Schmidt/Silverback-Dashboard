@@ -17,7 +17,7 @@ export async function loadTeam(token, s) {
 export function renderTeam(el, s) {
   host = el, stats = s;
   team = cache.get(`${s.repo}|${s.period}`) || null;
-  if (!team) { el.innerHTML = `<div class="sk" style="height:60px;width:320px"></div><div class="sk" style="height:130px"></div><div class="sk" style="height:130px"></div><div class="team-stats">${'<div class="sk" style="height:120px"></div>'.repeat(5)}</div><div class="sk" style="height:420px"></div>`; return; }
+  if (!team) { el.innerHTML = `<div class="sk" style="height:60px;width:320px"></div><div class="rankcards"><div class="sk" style="height:130px"></div><div class="sk" style="height:130px"></div></div><div class="team-stats">${'<div class="sk" style="height:120px"></div>'.repeat(5)}</div><div class="sk" style="height:420px"></div>`; return; }
   draw();
 }
 
@@ -91,8 +91,7 @@ function draw() {
       <div><h1 style="font-size:26px;font-weight:700;letter-spacing:-.01em">Team performance</h1>
         <p class="muted" style="margin:4px 0 0">${org} · ${repoName} · ${t.rows.length} active member${t.rows.length === 1 ? "" : "s"} ${periodLabel(t.period, t.at)}</p></div>
       </div>
-    ${rankCard(`Silverback rate · ${repoName}`, t.rate)}
-    ${rankCard(`Silverback rate · ${org}`, s.orgRate)}
+    <div class="rankcards">${rankCard(`Silverback rate · ${repoName}`, t.rate)}${rankCard(`Silverback rate · ${org}`, s.orgRate)}</div>
     <section class="team-stats" aria-label="Team stats">
       ${stat("Merged PRs", t.merged, "all members, into develop")}
       ${stat("Median cycle time", t.cycle == null ? "—" : `${t.cycle.toFixed(1)} d`, "opened → merged")}
