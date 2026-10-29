@@ -413,7 +413,7 @@ function issueBody(i, status) {
 }
 
 const drawerHtml = (chip, ref, title, sub, url) => `<button type="button" class="scrim" aria-label="Close details" data-close tabindex="-1"></button>
-  <aside role="dialog" aria-modal="true" aria-labelledby="dtitle"><header><div style="display:flex;align-items:center;gap:8px">${chip}<span class="mono muted" style="font-size:13px">${ref}</span>
+  <aside role="dialog" aria-modal="true" aria-labelledby="dtitle"><div class="grip" role="separator" aria-orientation="vertical" aria-label="Resize details panel" tabindex="0"></div><header><div style="display:flex;align-items:center;gap:8px">${chip}<span class="mono muted" style="font-size:13px">${ref}</span>
     <button type="button" class="dbtn" id="dclose" data-close aria-label="Close" style="margin-left:auto;width:40px;justify-content:center;padding:0">✕</button></div>
     <h2 id="dtitle">${esc(title)}</h2><div class="sub" style="margin:0">${sub}</div></header>
   <div class="body" id="dbody"><div class="sk" style="height:80px"></div><div class="sk" style="height:160px"></div></div>
@@ -455,3 +455,22 @@ document.addEventListener("click", (e) => {
   openDetail(t.dataset.detail);
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !drawer.hidden) closeDetail(); });
+
+// Drag the panel's left edge (or use the arrow keys on it) to resize; the width is kept for next time.
+const setWidth = (px) => {
+  const w = Math.round(Math.min(innerWidth * 0.9, Math.max(360, px)));
+  drawer.style.setProperty("--dw", `${w}px`);
+  set("drawerWidth", String(w));
+};
+get("drawerWidth").then((w) => w && drawer.style.setProperty("--dw", `${w}px`));
+drawer.addEventListener("pointerdown", (e) => {
+  if (!e.target.classList.contains("grip")) return;
+  e.target.setPointerCapture(e.pointerId);
+  const move = (ev) => setWidth(innerWidth - ev.clientX);
+  e.target.addEventListener("pointermove", move);
+  e.target.addEventListener("pointerup", () => e.target.removeEventListener("pointermove", move), { once: true });
+});
+drawer.addEventListener("keydown", (e) => {
+  if (!e.target.classList.contains("grip") || !["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+  setWidth(drawer.querySelector("aside").offsetWidth + (e.key === "ArrowLeft" ? 40 : -40));
+});

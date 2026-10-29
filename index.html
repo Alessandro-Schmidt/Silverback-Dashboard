@@ -223,7 +223,9 @@
   #drawer { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: flex-end; }
   #drawer[hidden] { display: none; }
   #drawer .scrim { position: absolute; inset: 0; background: rgba(1, 4, 9, .55); border: 0; padding: 0; cursor: default; }
-  #drawer aside { position: relative; width: 480px; max-width: 100%; height: 100%; box-sizing: border-box; background: var(--card); border-left: 1px solid var(--edge); display: flex; flex-direction: column; box-shadow: -16px 0 40px rgba(0, 0, 0, .45); }
+  #drawer aside { position: relative; flex: none; gap: 0; width: var(--dw, 33.333vw); min-width: min(360px, 100%); max-width: 100%; height: 100%; box-sizing: border-box; background: var(--card); border-left: 1px solid var(--edge); display: flex; flex-direction: column; box-shadow: -16px 0 40px rgba(0, 0, 0, .45); }
+  #drawer .grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; }
+  #drawer .grip:hover, #drawer .grip:focus-visible { background: var(--accent); opacity: .5; outline: none; }
   #drawer header { padding: 18px 20px 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
   #drawer h2 { margin: 0; font-size: 19px; line-height: 1.35; }
   #drawer .body { flex: 1 1 auto; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 20px; }
