@@ -1,19 +1,28 @@
-// One GraphQL query for every tile. ETag doesn't apply: GraphQL is a POST.
+// The stats come from five small GraphQL queries run in parallel. One big query used to pass GitHub's ~10 s limit
+// (GitHub then answers 502 without CORS headers, which the browser reports as "Failed to fetch").
 // Personal stats are scoped to the configured repo; @me is the token's owner.
 const REVIEWS = "reviews(first:50){ nodes{ state submittedAt } }";
-export const QUERY = `query($owner:String!,$name:String!,$org:String!,$qOpen:String!,$qMerged:String!,$qIssues:String!,$qDevelop:String!,$qFirst:String!,$qRepo:String!,$qOrg:String!){
-  viewer{ login avatarUrl }
-  repository(owner:$owner,name:$name){ pullRequests(states:OPEN){totalCount} issues(states:OPEN){totalCount} stargazerCount }
-  organization(login:$org){ avatarUrl repositories(first:100){ totalCount nodes{ pullRequests(states:OPEN){totalCount} languages(first:10){ edges{ size node{ name } } } } } }
-  myOpen: search(query:$qOpen,type:ISSUE,first:100){ nodes{ ... on PullRequest { number title url isDraft createdAt headRefName comments{totalCount} reviews{totalCount} } } }
-  myFirst: search(query:$qFirst,type:ISSUE,first:1){ nodes{ ... on PullRequest { createdAt } ... on Issue { createdAt } } }
-  myMerged: search(query:$qMerged,type:ISSUE,first:1){ issueCount }
-  myIssues: search(query:$qIssues,type:ISSUE,first:100){ nodes{ ... on Issue { number title url createdAt closedByPullRequestsReferences(first:1){ nodes{ number } }
-    projectItems(first:5){ nodes{ id project{ id } fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue{ name optionId field{ ... on ProjectV2SingleSelectField{ id options{ id name } } } } } } } } } }
-  myDevelop: search(query:$qDevelop,type:ISSUE,first:100){ nodes{ ... on PullRequest { createdAt mergedAt additions deletions ${REVIEWS} } } }
-  repoMerged: search(query:$qRepo,type:ISSUE,first:100){ nodes{ ... on PullRequest { mergedAt ${REVIEWS} } } }
-  orgMerged: search(query:$qOrg,type:ISSUE,first:100){ nodes{ ... on PullRequest { mergedAt ${REVIEWS} } } }
-}`;
+const PR_SEARCH = (alias, q, fields, first = 100) => `${alias}: search(query:"${q.replace(/"/g, '\\"')}",type:ISSUE,first:${first}){ ${fields} }`;
+export const queries = (repo, org, since) => {
+  const [owner, name] = repo.split("/"), after = ` merged:>=${since.toISOString()}`;
+  const develop = `repo:${repo} is:pr is:merged author:@me base:develop`;
+  return {
+    core: `{ viewer{ login avatarUrl }
+      repository(owner:"${owner}",name:"${name}"){ pullRequests(states:OPEN){totalCount} issues(states:OPEN){totalCount} stargazerCount }
+      organization(login:"${org}"){ avatarUrl }
+      ${PR_SEARCH("myOpen", `repo:${repo} is:pr is:open author:@me`, "nodes{ ... on PullRequest { number title url isDraft createdAt headRefName comments{totalCount} reviews{totalCount} } }")}
+      ${PR_SEARCH("myFirst", `org:${org} author:@me sort:created-asc`, "nodes{ ... on PullRequest { createdAt } ... on Issue { createdAt } }", 1)}
+      ${PR_SEARCH("myMerged", develop + after, "issueCount", 1)}
+      ${PR_SEARCH("myIssues", `repo:${repo} is:issue is:open assignee:@me`, `nodes{ ... on Issue { number title url createdAt closedByPullRequestsReferences(first:1){ nodes{ number } }
+        projectItems(first:5){ nodes{ id project{ id } fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue{ name optionId field{ ... on ProjectV2SingleSelectField{ id options{ id name } } } } } } } } }`)} }`,
+    // Org pulse: one search counts the open PRs (instead of 100 per-repo counts); top 3 languages per repo, by size.
+    pulse: `{ organization(login:"${org}"){ repositories(first:100){ totalCount nodes{ languages(first:3,orderBy:{field:SIZE,direction:DESC}){ edges{ size node{ name } } } } } }
+      ${PR_SEARCH("orgOpen", `org:${org} is:pr is:open`, "issueCount", 1)} }`,
+    mine: `{ ${PR_SEARCH("myDevelop", `${develop}${after} sort:updated-desc`, `nodes{ ... on PullRequest { createdAt mergedAt additions deletions ${REVIEWS} } }`)} }`,
+    repo: `{ ${PR_SEARCH("repoMerged", `repo:${repo} is:pr is:merged base:develop${after}`, `nodes{ ... on PullRequest { mergedAt ${REVIEWS} } }`)} }`,
+    org: `{ ${PR_SEARCH("orgMerged", `org:${org} is:pr is:merged${after}`, `nodes{ ... on PullRequest { mergedAt ${REVIEWS} } }`)} }`,
+  };
+};
 
 // Silverback rate: a merged PR is "first try" when no CHANGES_REQUESTED review came before its first APPROVED one.
 export function firstTry(pr) {
@@ -52,16 +61,17 @@ const monday = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); d.set
 export const PERIODS = { w: "This week", m: "This month", "10": "Last 10 working days", "30": "Last 30 working days", q: "This quarter", "0": "Overall" };
 // Menu order (object keys that look like numbers would otherwise sort first).
 export const PERIOD_ORDER = ["w", "m", "10", "30", "q", "0"];
-export const DEFAULT_PERIOD = "30";
+export const DEFAULT_PERIOD = "0"; // overall
 export const validPeriod = (p) => (p in PERIODS ? p : DEFAULT_PERIOD);
 // Start of a period: this week (Monday), this month, the last 10 or 30 working days, or this calendar quarter.
 export function periodStart(now, period) {
   const d = new Date(now);
+  period = validPeriod(period); // unknown → the default, before any branch (0 working days would never end)
   if (period === "0") return new Date(0); // overall: everything GitHub returns
   if (period === "w") return monday(now);
   if (period === "m") return new Date(d.getFullYear(), d.getMonth(), 1);
   if (period === "q") return new Date(d.getFullYear(), d.getMonth() - (d.getMonth() % 3), 1);
-  return workdaysSince(now, Number(validPeriod(period)));
+  return workdaysSince(now, Number(period));
 }
 const ddmmyyyy = (t) => new Date(t).toLocaleDateString("en-GB");
 // Option text: the quarter says when it started, since "this quarter" alone is ambiguous.
@@ -134,14 +144,14 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
   period = validPeriod(period);
   const since = periodStart(now, period), recent = (t) => new Date(t) >= since;
   const mergedMine = data.myDevelop.nodes.filter((p) => recent(p.mergedAt)), mine = silverbackRate(mergedMine);
-  const r = data.repository, o = data.organization.repositories;
+  const r = data.repository, o = data.pulse?.organization.repositories ?? { totalCount: null, nodes: [] };
   const langs = {};
   for (const n of o.nodes) for (const e of n.languages.edges) langs[e.node.name] = (langs[e.node.name] || 0) + e.size; // bytes
   return {
     repo, org, at: now, period, since: since.getTime(),
     prs: r.pullRequests.totalCount, issues: r.issues.totalCount, stars: r.stargazerCount,
     me: data.viewer.login, meAvatar: data.viewer.avatarUrl, orgRepos: o.totalCount, orgLogo: data.organization.avatarUrl,
-    orgPrs: o.nodes.reduce((s, n) => s + n.pullRequests.totalCount, 0),
+    orgPrs: data.pulse?.orgOpen.issueCount ?? null,
     // Oldest first; `type` is the branch prefix (feat/…, fix/…).
     myOpen: data.myOpen.nodes.map((p) => ({ num: p.number, title: p.title, url: p.url, draft: p.isDraft, comments: p.comments.totalCount, reviews: p.reviews.totalCount,
       type: p.headRefName.includes("/") ? p.headRefName.split("/")[0] : "", createdAt: p.createdAt })).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
@@ -170,7 +180,9 @@ async function gql(token, query, variables) {
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ query, variables }),
   });
-  const json = await res.json();
+  // A timeout or outage answers with an HTML page (and no CORS headers, so a browser only sees "Failed to fetch").
+  const json = await res.json().catch(() => null);
+  if (!json) throw new Error(`GitHub took too long to answer (HTTP ${res.status}). Try again in a moment`);
   if (!res.ok || json.errors) throw new Error(json.message || json.errors[0].message);
   return json.data;
 }
@@ -187,16 +199,12 @@ export const listRepos = async (token, org) =>
   (await gql(token, "query($org:String!){organization(login:$org){repositories(first:100,orderBy:{field:PUSHED_AT,direction:DESC}){nodes{nameWithOwner}}}}", { org }))
     .organization.repositories.nodes.map((r) => r.nameWithOwner);
 
-// One query per refresh. Merged PRs are those into develop, since the period start.
+// Merged PRs are those into develop, since the period start. The org pulse is optional: if it fails, the rest still shows.
 export async function fetchStats(token, repo, org, period = DEFAULT_PERIOD) {
-  const [owner, name] = repo.split("/");
-  const now = Date.now(), since = periodStart(now, validPeriod(period)), after = (d) => ` merged:>=${d.toISOString()}`;
-  const develop = `repo:${repo} is:pr is:merged author:@me base:develop`;
-  return summarize(await gql(token, QUERY, { owner, name, org,
-      qOpen: `repo:${repo} is:pr is:open author:@me`, qMerged: develop + after(since),
-      qIssues: `repo:${repo} is:issue is:open assignee:@me`, qDevelop: `${develop}${after(since)} sort:updated-desc`,
-      qFirst: `org:${org} author:@me sort:created-asc`,
-      qRepo: `repo:${repo} is:pr is:merged base:develop${after(since)}`, qOrg: `org:${org} is:pr is:merged${after(since)}` }), repo, org, period, now);
+  const now = Date.now(), since = periodStart(now, validPeriod(period)), q = queries(repo, org, since);
+  const [core, pulse, mine, repoM, orgM] = await Promise.all([
+    gql(token, q.core), gql(token, q.pulse).catch(() => null), gql(token, q.mine), gql(token, q.repo), gql(token, q.org)]);
+  return summarize({ ...core, pulse, ...mine, ...repoM, ...orgM }, repo, org, period, now);
 }
 
 // ---- Team view ----

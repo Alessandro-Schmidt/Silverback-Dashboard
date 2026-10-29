@@ -1,5 +1,5 @@
 import { crest, explainer, mark } from "./lib/crest.js";
-import { listOrgs, listRepos, PERIOD_ORDER, periodOption, sideEye, tier, toNextTier, validPeriod } from "./lib/stats.js";
+import { listOrgs, listRepos, DEFAULT_PERIOD, PERIOD_ORDER, periodOption, sideEye, tier, toNextTier, validPeriod } from "./lib/stats.js";
 
 const $ = (id) => document.getElementById(id);
 const form = $("form"), store = chrome.storage.local;
@@ -111,6 +111,8 @@ $("gear").addEventListener("click", async () => {
   if (!$("setup").hidden && token) fillOrgs(token, org, repo);
 });
 
-const { token, repo } = await store.get(["token", "repo"]);
+// Every time the popup opens it starts on Overall, refreshing if another period was left selected.
+const { token, repo, period } = await store.get(["token", "repo", "period"]);
 show(!token || !repo);
 render();
+if (token && repo && period !== DEFAULT_PERIOD) { await store.set({ period: DEFAULT_PERIOD }); refresh(); }

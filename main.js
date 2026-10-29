@@ -1,7 +1,7 @@
 import { Preferences } from "@capacitor/preferences";
 import { startLoading } from "./loader.js";
 import { crest, explainer, rateChart } from "./extension/lib/crest.js";
-import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, pointLabel, tick, validPeriod, setStatus, tenure, tier, TIERS } from "./extension/lib/stats.js";
+import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, pointLabel, tick, validPeriod, DEFAULT_PERIOD, setStatus, tenure, tier, TIERS } from "./extension/lib/stats.js";
 import { renderTeam, loadTeam, rankCard } from "./team.js";
 import "./tooltip.js";
 
@@ -151,8 +151,8 @@ function render(s) {
       </section>
       <section class="card"><h2 class="caps">${org} org</h2>
         <div class="mini" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-          <div><div class="mono">${s.orgRepos}</div><div class="muted">Repositories</div></div>
-          <div><div class="mono">${s.orgPrs}</div><div class="muted">Open PRs</div></div></div>
+          <div><div class="mono">${s.orgRepos ?? "—"}</div><div class="muted">Repositories</div></div>
+          <div><div class="mono">${s.orgPrs ?? "—"}</div><div class="muted">Open PRs</div></div></div>
 
         <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px">${(s.langs ? s.langs.split(", ") : []).map((l) => `<span class="chip">${esc(l)}</span>`).join("")}</div>
       </section>
@@ -358,7 +358,9 @@ for (const f of [form, $("welcome-form")]) f.addEventListener("submit", async (e
 
 const cached = await get("stats");
 if (cached) render(JSON.parse(cached));
-period.value = validPeriod(await get("period"));
+// Every visit starts on Overall; a period picked during the visit holds until the next one.
+await set("period", DEFAULT_PERIOD);
+period.value = DEFAULT_PERIOD;
 showToken(!!(await get("token")));
 if (!(await get("token"))) document.body.classList.add("first-run");
 await loadPickers();

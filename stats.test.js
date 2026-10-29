@@ -5,7 +5,7 @@ import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, t
 const rev = (...states) => ({ nodes: states.map((state, i) => ({ state, submittedAt: `2026-10-0${i + 1}T10:00:00Z`, author: { login: "rev" } })) });
 const base = (extra = {}) => ({
   viewer: { login: "me" }, repository: { pullRequests: { totalCount: 0 }, issues: { totalCount: 0 }, stargazerCount: 0 },
-  organization: { repositories: { totalCount: 0, nodes: [] } },
+  organization: {}, pulse: { organization: { repositories: { totalCount: 0, nodes: [] } }, orgOpen: { issueCount: 0 } },
   myOpen: { nodes: [] }, myMerged: { issueCount: 0 }, myFirst: { nodes: [] }, myIssues: { nodes: [] }, myDevelop: { nodes: [] },
   repoMerged: { nodes: [] }, orgMerged: { nodes: [] }, ...extra,
 });
@@ -14,7 +14,7 @@ test("summarize: repo and org pulse", () => {
   const n = (prs, lang, size = 1) => ({ pullRequests: { totalCount: prs }, languages: { edges: lang ? [{ size, node: { name: lang } }] : [] } });
   const s = summarize(base({
     repository: { pullRequests: { totalCount: 3 }, issues: { totalCount: 5 }, stargazerCount: 7 },
-    organization: { repositories: { totalCount: 4, nodes: [n(1, "Go", 50), n(2, "TS", 10), n(0, "TS", 10), n(4, null)] } },
+    pulse: { organization: { repositories: { totalCount: 4, nodes: [n(1, "Go", 50), n(2, "TS", 10), n(0, "TS", 10), n(4, null)] } }, orgOpen: { issueCount: 7 } },
     repoMerged: { nodes: [{ reviews: rev("APPROVED") }, { reviews: rev("CHANGES_REQUESTED", "APPROVED") }] },
   }), "a/b", "a");
   assert.deepEqual([s.prs, s.issues, s.stars, s.orgRepos, s.orgPrs, s.langs, s.repoRate.rate, s.orgRate.rate], [3, 5, 7, 4, 7, "Go, TS", 50, null]);
@@ -40,8 +40,9 @@ test("issues sort by board column", () => {
 
 test("periods", () => {
   const now = new Date(2026, 9, 29, 15); // Thursday 29 Oct 2026
-  assert.deepEqual(["w", "m", "q", "10", "30", "bogus"].map((p) => periodStart(now, p).toDateString()),
-    [new Date(2026, 9, 26), new Date(2026, 9, 1), new Date(2026, 9, 1), new Date(2026, 9, 16), new Date(2026, 8, 18), new Date(2026, 8, 18)].map((d) => d.toDateString()));
+  assert.deepEqual(["w", "m", "q", "10", "30"].map((p) => periodStart(now, p).toDateString()),
+    [new Date(2026, 9, 26), new Date(2026, 9, 1), new Date(2026, 9, 1), new Date(2026, 9, 16), new Date(2026, 8, 18)].map((d) => d.toDateString()));
+  assert.equal(periodStart(now, "bogus").getTime(), 0); // unknown → the default, Overall
   assert.deepEqual([periodOption("q", now), periodLabel("w", now), periodLabel("30", now), periodOption("0"), periodLabel("0", now), periodStart(now, "0").getTime()],
     ["This quarter (since 1 Oct)", "this week · since Mon 26/10/2026", "since 18/09/2026", "Overall", "overall", 0]);
 });
@@ -96,6 +97,11 @@ test("series buckets by day, week or month with the period", () => {
   const month = series(prs, periodStart(now, "30"), now);
   assert.deepEqual([month[0].unit, month.at(-1).rate, month.at(-2).rate], ["week", 67, 100]);
   assert.equal(series(prs, periodStart(now, "0"), now)[0].unit, "day"); // overall starts at the first merge (20 Oct)
+});
+
+test("summarize without the optional org pulse", () => {
+  const s = summarize(base({ pulse: null }), "a/b", "a");
+  assert.deepEqual([s.orgRepos, s.orgPrs, s.langs], [null, null, ""]);
 });
 
 test("lines added and removed by your merged PRs in the period", () => {
