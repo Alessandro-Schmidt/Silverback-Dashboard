@@ -13,7 +13,7 @@ export const queries = (repo, org, since) => {
       ${PR_SEARCH("myOpen", `repo:${repo} is:pr is:open author:@me`, "nodes{ ... on PullRequest { number title url isDraft createdAt headRefName comments{totalCount} reviews{totalCount} } }")}
       ${PR_SEARCH("myFirst", `org:${org} author:@me sort:created-asc`, "nodes{ ... on PullRequest { createdAt } ... on Issue { createdAt } }", 1)}
       ${PR_SEARCH("myMerged", develop + after, "issueCount", 1)}
-      ${PR_SEARCH("myIssues", `repo:${repo} is:issue is:open assignee:@me`, `nodes{ ... on Issue { number title url createdAt closedByPullRequestsReferences(first:1){ nodes{ number } }
+      ${PR_SEARCH("myIssues", `repo:${repo} is:issue is:open assignee:@me`, `nodes{ ... on Issue { number title url createdAt issueType{ name } labels(first:10){ nodes{ name } } subIssuesSummary{ total completed } closedByPullRequestsReferences(first:1){ nodes{ number } }
         projectItems(first:5){ nodes{ id project{ id } fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue{ name optionId field{ ... on ProjectV2SingleSelectField{ id options{ id name } } } } } } } } }`)} }`,
     // Org pulse: one search counts the open PRs (instead of 100 per-repo counts); top 3 languages per repo, by size.
     pulse: `{ organization(login:"${org}"){ repositories(first:100){ totalCount nodes{ languages(first:3,orderBy:{field:SIZE,direction:DESC}){ edges{ size node{ name } } } } } }
@@ -158,7 +158,8 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
     myIssues: data.myIssues.nodes.map((i) => {
       const item = i.projectItems.nodes.find((n) => n.fieldValueByName?.name), v = item?.fieldValueByName;
       // Board column order; issues without a status go last.
-      return { num: i.number, title: i.title, url: i.url, pr: i.closedByPullRequestsReferences?.nodes[0]?.number || 0, status: v?.name || "No status",
+      return { num: i.number, title: i.title, url: i.url, pr: i.closedByPullRequestsReferences?.nodes[0]?.number || 0, epic: /^epic$/i.test(i.issueType?.name) || !!i.labels?.nodes.some((l) => /^epic$/i.test(l.name)), subs: i.subIssuesSummary?.total || 0, subsDone: i.subIssuesSummary?.completed || 0,
+        status: v?.name || "No status",
         // What setStatus needs; ponytail: issues with no status yet can't be moved, would need the project's Status field looked up.
         move: v ? { project: item.project.id, item: item.id, field: v.field.id, optionId: v.optionId, options: v.field.options } : null, rank: v ? v.field.options.findIndex((o) => o.id === v.optionId) : Infinity };
     }).sort((a, b) => a.rank - b.rank),

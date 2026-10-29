@@ -167,7 +167,7 @@ function render(s) {
     <div class="board">${cols.map((c, n) => `<div class="col"${c.id ? ` data-option="${esc(c.id)}"` : ""}>
       <div class="col-head"><span class="dot" style="background:${c.label === "No status" ? "var(--dim)" : COLUMN_COLORS[n % COLUMN_COLORS.length]}"></span>${esc(c.label)}<span class="mono muted" style="margin-left:auto;font-size:12px">${c.items.length}</span></div>
       ${c.items.map((i) => `<div class="issue"${i.move ? ` draggable="true" data-issue="${s.myIssues.indexOf(i)}"` : ""}><a href="${esc(i.url)}" target="_blank" rel="noopener" draggable="false"><span class="mono muted">#${i.num}</span> ${esc(i.title)}</a>
-        ${i.pr ? `<span class="mono tag">PR #${i.pr}</span>` : ""}</div>`).join("")}
+        ${i.epic ? `<span class="mono tag">Epic</span>` : ""}${i.subs ? `<span class="mono tag">${i.subsDone}/${i.subs} subtasks</span>` : ""}${i.pr ? `<span class="mono tag">PR #${i.pr}</span>` : ""}</div>`).join("")}
     </div>`).join("") || `<p class="muted">No open issues assigned to you.</p>`}</div>
   </section>`;
 }
