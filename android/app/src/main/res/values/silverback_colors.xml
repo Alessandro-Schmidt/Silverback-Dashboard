@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="silverback_tile">#FFFFFF</color>
+    <color name="silverback_fg">#1F2328</color>
+    <color name="silverback_muted">#656D76</color>
+</resources>

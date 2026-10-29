@@ -1,5 +1,5 @@
 {
-  "name": "ghero",
+  "name": "silverback-dashboard",
   "version": "1.0.0",
   "description": "GitHub stats widgets, no backend",
   "scripts": {

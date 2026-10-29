@@ -1,4 +1,4 @@
-package io.ghero.app;
+package io.silverback.app;
 
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
@@ -17,11 +17,11 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Home-screen tiles. Reads what the app saved (CapacitorStorage), refetches with the same token, keeps the last values offline. */
-public class GHeroWidget extends AppWidgetProvider {
+public class SilverbackWidget extends AppWidgetProvider {
     /** Open PRs of the saved repository. */
-    public static class Repo extends GHeroWidget {}
+    public static class Repo extends SilverbackWidget {}
     /** Repository count and open PRs of the saved organization. */
-    public static class Org extends GHeroWidget {}
+    public static class Org extends SilverbackWidget {}
 
     static final String QUERY = "query($owner:String!,$name:String!,$org:String!){"
         + "repository(owner:$owner,name:$name){pullRequests(states:OPEN){totalCount} issues(states:OPEN){totalCount} stargazerCount}"
@@ -56,7 +56,7 @@ public class GHeroWidget extends AppWidgetProvider {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget);
         v.setTextViewText(R.id.num, num);
         v.setTextViewText(R.id.label, org ? "Repositories" : "Open PRs");
-        v.setTextViewText(R.id.sub, sub.isEmpty() ? "Open GHero to sign in" : sub);
+        v.setTextViewText(R.id.sub, sub.isEmpty() ? "Open Silverback to sign in" : sub);
         v.setOnClickPendingIntent(R.id.root,
             PendingIntent.getActivity(context, 0, new Intent(context, MainActivity.class), PendingIntent.FLAG_IMMUTABLE));
         manager.updateAppWidget(new ComponentName(context, getClass()), v);

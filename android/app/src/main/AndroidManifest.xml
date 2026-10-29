@@ -34,11 +34,11 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <receiver android:name=".GHeroWidget$Repo" android:label="GHero open PRs" android:exported="false">
+        <receiver android:name=".SilverbackWidget$Repo" android:label="Silverback open PRs" android:exported="false">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
         </receiver>
-        <receiver android:name=".GHeroWidget$Org" android:label="GHero organization" android:exported="false">
+        <receiver android:name=".SilverbackWidget$Org" android:label="Silverback organization" android:exported="false">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
         </receiver>

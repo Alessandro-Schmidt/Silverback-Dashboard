@@ -1,4 +1,4 @@
-package io.ghero.app;
+package io.silverback.app;
 
 import com.getcapacitor.BridgeActivity;
 

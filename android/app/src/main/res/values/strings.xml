@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">GHero</string>
-    <string name="title_activity_main">GHero</string>
-    <string name="package_name">io.ghero.app</string>
-    <string name="custom_url_scheme">io.ghero.app</string>
+    <string name="app_name">Silverback</string>
+    <string name="title_activity_main">Silverback</string>
+    <string name="package_name">io.silverback.app</string>
+    <string name="custom_url_scheme">io.silverback.app</string>
 </resources>
