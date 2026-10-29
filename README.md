@@ -18,7 +18,7 @@ The key metric: the share of your PRs merged into `develop` in the period that w
 It's shown for you, for the repository (all authors) and for the whole organization.
 
 The period select (this week, this month, the last 10 or 30 working days, this quarter) drives every number;
-the trend charts always show the last 6 weeks. The **Team** tab, open to everyone, shows: the team's rate,
+the charts follow it too, one point per day (up to 2 weeks), per week (up to 24 weeks) or per month. The **Team** tab, open to everyone, shows: the team's rate,
 merged PRs, cycle time, review balance, things that need attention, and a sortable members table.
 
 ## Run it

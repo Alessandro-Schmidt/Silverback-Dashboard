@@ -88,23 +88,13 @@ export const median = (xs) => {
 };
 const cycleDays = (p) => (new Date(p.mergedAt) - new Date(p.createdAt)) / 864e5;
 
-// The last `n` Monday-start weeks of merged PRs: count, first-try count, median days opened→merged.
-export function weeks(prs, now, n = 6) {
-  const first = monday(now);
-  return Array.from({ length: n }, (_, i) => {
-    const start = new Date(first); start.setDate(start.getDate() - 7 * (n - 1 - i));
-    const end = new Date(start); end.setDate(end.getDate() + 7);
-    const inWeek = prs.filter((p) => new Date(p.mergedAt) >= start && new Date(p.mergedAt) < end);
-    return { start: start.getTime(), merged: inWeek.length, first: inWeek.filter(firstTry).length, cycle: median(inWeek.map(cycleDays)) };
-  });
-}
-
-// Silverback rate over the period, for the rate charts: by day up to 2 weeks, by week up to ~6 months, else by month
-// (at most 24 points, the most recent). Overall starts at the first merge. A bucket with no merges has rate null.
-export function rateSeries(prs, since, now) {
+// Merged PRs over the chosen period, for every chart: one point per day (up to 2 weeks), per week (up to 24 weeks)
+// or per month, at most 24 (the most recent). Overall starts at the first merge. Each point: merged count, the
+// Silverback rate (first / total / rate, null with no merges) and the median cycle time in days.
+export function series(prs, since, now) {
   const first = prs.reduce((m, p) => Math.min(m, new Date(p.mergedAt)), now);
   const start = new Date(+since ? since : first), span = (now - start) / 864e5; // overall (epoch) starts at the first merge
-  const unit = span <= 14 ? "day" : span <= 182 ? "week" : "month";
+  const unit = span <= 14 ? "day" : span <= 168 ? "week" : "month"; // ≤ 24 weekly points, else monthly
   const floor = (t) => {
     const d = new Date(t); d.setHours(0, 0, 0, 0);
     if (unit === "week") return monday(d);
@@ -115,10 +105,13 @@ export function rateSeries(prs, since, now) {
   const out = [];
   for (let b = floor(start); b <= now; b = next(b)) {
     const inB = prs.filter((p) => new Date(p.mergedAt) >= b && new Date(p.mergedAt) < next(b) && new Date(p.mergedAt) >= since);
-    out.push({ start: b.getTime(), unit, ...silverbackRate(inB) });
+    out.push({ start: b.getTime(), unit, merged: inB.length, ...silverbackRate(inB), cycle: median(inB.map(cycleDays)) });
   }
   return out.slice(-24);
 }
+// Axis tick ("26 Oct", "Oct 26") and full label ("29 Oct", "Week of 26 Oct", "October 2026") for a point.
+export const tick = (b) => new Date(b.start).toLocaleDateString("en-GB", b.unit === "month" ? { month: "short", year: "2-digit" } : { day: "numeric", month: "short" });
+export const pointLabel = (b) => b.unit === "month" ? new Date(b.start).toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : `${b.unit === "week" ? "Week of " : ""}${tick(b)}`;
 
 // "Side-eye": things waiting on you. Stale drafts, PRs nobody reviewed yet, issues ready for dev.
 export function sideEye(s) {
@@ -136,7 +129,7 @@ export function sideEye(s) {
 }
 
 // ponytail: org PRs, languages and every personal list cover the first 100 results; paginate if that's ever exceeded.
-// `period`: see periodStart; the personal numbers count only that period. Trends always cover the last 6 weeks.
+// `period`: see periodStart; every number and chart covers only that period.
 export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.now()) {
   period = validPeriod(period);
   const since = periodStart(now, period), recent = (t) => new Date(t) >= since;
@@ -163,9 +156,8 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
     // Lines added and removed by your PRs merged into develop in the period (GitHub's green ++ and red --).
     lines: mergedMine.reduce((l, p) => ({ added: l.added + (p.additions || 0), removed: l.removed + (p.deletions || 0) }), { added: 0, removed: 0 }),
     mine, repoRate: silverbackRate(data.repoMerged.nodes), orgRate: silverbackRate(data.orgMerged.nodes),
-    mySeries: rateSeries(data.myDevelop.nodes, since, now), repoSeries: rateSeries(data.repoMerged.nodes, since, now), orgSeries: rateSeries(data.orgMerged.nodes, since, now),
+    mySeries: series(data.myDevelop.nodes, since, now), repoSeries: series(data.repoMerged.nodes, since, now), orgSeries: series(data.orgMerged.nodes, since, now),
     newIssues: data.myIssues.nodes.filter((i) => recent(i.createdAt)).length,
-    weeks: weeks(data.myDevelop.nodes, now),
     // ponytail: GitHub only exposes org join dates to admins, so tenure starts at the first PR or issue you opened in the org.
     firstInOrg: data.myFirst.nodes[0]?.createdAt || null,
     langs: Object.entries(langs).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([l]) => l).join(", "),
@@ -195,15 +187,14 @@ export const listRepos = async (token, org) =>
   (await gql(token, "query($org:String!){organization(login:$org){repositories(first:100,orderBy:{field:PUSHED_AT,direction:DESC}){nodes{nameWithOwner}}}}", { org }))
     .organization.repositories.nodes.map((r) => r.nameWithOwner);
 
-// One query per refresh. Merged PRs are those into develop; the merged list reaches back to the period start or 6 weeks for the trends, whichever is earlier.
+// One query per refresh. Merged PRs are those into develop, since the period start.
 export async function fetchStats(token, repo, org, period = DEFAULT_PERIOD) {
   const [owner, name] = repo.split("/");
-  const now = Date.now(), since = periodStart(now, validPeriod(period)), sixWeeks = new Date(now - 42 * 864e5);
-  const from = since < sixWeeks ? since : sixWeeks, after = (d) => ` merged:>=${d.toISOString()}`;
+  const now = Date.now(), since = periodStart(now, validPeriod(period)), after = (d) => ` merged:>=${d.toISOString()}`;
   const develop = `repo:${repo} is:pr is:merged author:@me base:develop`;
   return summarize(await gql(token, QUERY, { owner, name, org,
       qOpen: `repo:${repo} is:pr is:open author:@me`, qMerged: develop + after(since),
-      qIssues: `repo:${repo} is:issue is:open assignee:@me`, qDevelop: `${develop}${after(from)} sort:updated-desc`,
+      qIssues: `repo:${repo} is:issue is:open assignee:@me`, qDevelop: `${develop}${after(since)} sort:updated-desc`,
       qFirst: `org:${org} author:@me sort:created-asc`,
       qRepo: `repo:${repo} is:pr is:merged base:develop${after(since)}`, qOrg: `org:${org} is:pr is:merged${after(since)}` }), repo, org, period, now);
 }
@@ -217,14 +208,13 @@ const TEAM_QUERY = `query($org:String!,$q:String!,$after:String){
     reviews(first:50){ nodes{ state submittedAt author{ login } } } } } }
 }`;
 
-// Every PR of the repo touched since the period start (or 6 weeks back, for the sparklines), with its reviews.
+// Every PR of the repo touched since the period start, with its reviews.
 // ponytail: stops at 5 pages (500 PRs); raise the cap for very busy repos.
 export async function fetchTeam(token, repo, org, period = DEFAULT_PERIOD) {
-  const now = Date.now(), since = periodStart(now, validPeriod(period)), sixWeeks = monday(now - 35 * 864e5);
-  const from = since < sixWeeks ? since : sixWeeks, prs = [];
+  const now = Date.now(), since = periodStart(now, validPeriod(period)), prs = [];
   let data, after = null;
   for (let page = 0; page < 5; page++) {
-    data = await gql(token, TEAM_QUERY, { org, q: `repo:${repo} is:pr updated:>=${from.toISOString()}`, after });
+    data = await gql(token, TEAM_QUERY, { org, q: `repo:${repo} is:pr updated:>=${since.toISOString()}`, after });
     prs.push(...data.search.nodes);
     if (!data.search.pageInfo.hasNextPage) break;
     after = data.search.pageInfo.endCursor;
@@ -248,7 +238,7 @@ export function summarizeTeam(prs, members, period = DEFAULT_PERIOD, now = Date.
     const open = prs.filter((p) => p.state === "OPEN" && p.author?.login === m.login).length;
     const rate = silverbackRate(mine);
     return { ...m, merged: mine.length, open, reviews, rate: rate.rate, cycle: median(mine.map(cycleDays)),
-      weekly: weeks(merged.filter((p) => p.author.login === m.login), now).map((w) => w.merged) };
+      trend: series(merged.filter((p) => p.author.login === m.login), since, now).map((b) => b.merged) };
   }).filter((m) => m.merged || m.open || m.reviews);
 
   const teamCycle = median(inPeriod.map(cycleDays));
@@ -263,8 +253,7 @@ export function summarizeTeam(prs, members, period = DEFAULT_PERIOD, now = Date.
 
   return {
     at: now, period, since: since.getTime(), rows, alerts,
-    rate: silverbackRate(inPeriod), series: rateSeries(inPeriod, since, now), merged: inPeriod.length, cycle: teamCycle,
+    rate: silverbackRate(inPeriod), series: series(merged, since, now), merged: inPeriod.length, cycle: teamCycle,
     open: prs.filter((p) => p.state === "OPEN").length, reviews: rows.reduce((n, m) => n + m.reviews, 0),
-    weeks: weeks(merged, now).map((w) => ({ start: w.start, total: w.merged })),
   };
 }

@@ -1,7 +1,7 @@
 // Team view (design board "Team"), open to everyone: the repo's and org's Silverback rate,
-// team totals, merged per week, review balance, things that need attention, and a sortable members table.
+// team totals, merged over the period, review balance, things that need attention, and a sortable members table.
 import { crest, rateChart } from "./extension/lib/crest.js";
-import { fetchTeam, periodLabel, tier } from "./extension/lib/stats.js";
+import { fetchTeam, periodLabel, pointLabel, tick, tier } from "./extension/lib/stats.js";
 
 const esc = (v) => String(v).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const day = (t) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
@@ -39,12 +39,13 @@ function draw() {
   const rankRow = (label, r, series, who) => `<div class="rankrow">${rankCard(label, r)}${rateChart(series, `${label} over time`, `${who}, ${periodLabel(t.period, t.at)}`)}</div>`;
   const stat = (label, value, sub) => `<div class="card" style="padding:20px 22px"><div class="label" style="font-size:14px">${label}</div><div class="mono" style="font-size:38px;font-weight:600;line-height:1.2;margin-top:4px">${value}</div><div class="sub" style="margin-top:4px">${sub}</div></div>`;
 
-  const wmax = Math.max(1, ...t.weeks.map((w) => w.total));
-  const weeksChart = `<figure class="card teamcard"><figcaption><div style="font-weight:600">Team merged PRs per week</div><div class="sub" style="margin-top:2px">All members, merged to develop</div></figcaption>
-    <div class="bars" style="height:270px" aria-label="Team merged PRs per week: ${t.weeks.map((w) => `${day(w.start)} ${w.total}`).join(", ")}">${t.weeks.map((w) => `<div class="bar" tabindex="0" aria-label="Week of ${day(w.start)}: ${w.total} PRs merged">
-      <span class="mono" style="font-size:12px;margin-bottom:4px">${w.total}</span><div style="width:36px;height:${(w.total / wmax) * 240}px;background:var(--accent);border-radius:4px 4px 0 0"></div>
-      <div class="tip"><div class="muted">Week of ${day(w.start)}</div><div>${w.total} PRs merged</div></div></div>`).join("")}</div>
-    <div class="xlabels">${t.weeks.map((w) => `<span>${day(w.start)}</span>`).join("")}</div></figure>`;
+  // Team merges over the chosen period (one bar per day, week or month).
+  const pts = t.series, wmax = Math.max(1, ...pts.map((b) => b.merged)), unit = pts[0]?.unit || "week";
+  const weeksChart = `<figure class="card teamcard"><figcaption><div style="font-weight:600">Team merged PRs per ${unit}</div><div class="sub" style="margin-top:2px">All members, merged to develop, ${periodLabel(t.period, t.at)}</div></figcaption>
+    <div class="bars" style="height:270px" aria-label="Team merged PRs per ${unit}: ${pts.map((b) => `${pointLabel(b)} ${b.merged}`).join(", ")}">${pts.map((b) => `<div class="bar" tabindex="0" aria-label="${pointLabel(b)}: ${b.merged} PRs merged">
+      ${pts.length <= 12 ? `<span class="mono" style="font-size:12px;margin-bottom:4px">${b.merged}</span>` : ""}<div style="width:70%;max-width:36px;height:${(b.merged / wmax) * 240}px;background:var(--accent);border-radius:4px 4px 0 0"></div>
+      <div class="tip"><div class="muted">${pointLabel(b)}</div><div>${b.merged} PRs merged</div></div></div>`).join("")}</div>
+    <div class="xlabels">${pts.map((b, i) => `<span>${(pts.length - 1 - i) % Math.max(1, Math.ceil(pts.length / 7)) ? "" : tick(b)}</span>`).join("")}</div></figure>`;
 
   const bal = [...t.rows].sort((a, b) => b.merged - a.merged), bmax = Math.max(1, ...bal.map((m) => Math.max(m.merged, m.reviews)));
   const balance = `<figure class="card teamcard"><figcaption><div style="font-weight:600">Review balance</div><div class="sub" style="margin-top:2px">PRs merged vs. reviews given, per member</div></figcaption>
@@ -65,10 +66,10 @@ function draw() {
     const x = a[sort.key] ?? -1, y = b[sort.key] ?? -1;
     return (typeof x === "string" ? x.localeCompare(y) : x - y) * sort.dir;
   });
-  const cols = [["login", "Member"], ["merged", "Merged"], ["open", "Open"], ["rate", "Silverback"], ["cycle", "Cycle time"], ["reviews", "Reviews"], [null, "Last 6 weeks"]];
+  const cols = [["login", "Member"], ["merged", "Merged"], ["open", "Open"], ["rate", "Silverback"], ["cycle", "Cycle time"], ["reviews", "Reviews"], [null, "Over the period"]];
   const spark = (w) => {
-    const mx = Math.max(...w, 1), y = (v) => (24 - (v / mx) * 20).toFixed(1);
-    return `<svg width="100" height="28" viewBox="0 0 100 28" role="img" aria-label="Merged per week: ${w.join(", ")}"><polyline points="${w.map((v, i) => `${(4 + i * 18.4).toFixed(1)},${y(v)}`).join(" ")}" fill="none" stroke="#4C8DFF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="96" cy="${y(w.at(-1))}" r="3" fill="#4C8DFF"/></svg>`;
+    const mx = Math.max(...w, 1), y = (v) => (24 - (v / mx) * 20).toFixed(1), x = (i) => (w.length > 1 ? 4 + (i * 92) / (w.length - 1) : 96).toFixed(1);
+    return `<svg width="100" height="28" viewBox="0 0 100 28" role="img" aria-label="Merged over the period: ${w.join(", ")}"><polyline points="${w.map((v, i) => `${x(i)},${y(v)}`).join(" ")}" fill="none" stroke="#4C8DFF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="96" cy="${y(w.at(-1))}" r="3" fill="#4C8DFF"/></svg>`;
   };
   const table = `<section class="card" style="padding:0;overflow:hidden">
     <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)">
@@ -86,7 +87,7 @@ function draw() {
         <div role="cell" style="display:flex;align-items:center;gap:8px" title="${m.rate == null ? "No merged PRs" : tier(m.rate).name}">${rateCell(m.rate)}</div>
         <div role="cell" class="mono">${m.cycle == null ? "—" : `${m.cycle.toFixed(1)} d`}</div>
         <div role="cell" class="mono">${m.reviews}</div>
-        <div role="cell">${spark(m.weekly)}</div></div>`).join("")}
+        <div role="cell">${spark(m.trend)}</div></div>`).join("")}
       ${rows.length ? "" : `<div style="padding:28px 20px;text-align:center" class="muted">No member matches that handle.</div>`}
     </div></div></section>`;
 

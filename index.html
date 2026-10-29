@@ -113,8 +113,8 @@
   figure.card { margin: 0; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
   .bars { display: flex; align-items: flex-end; gap: 10px; height: 170px; border-bottom: 1px solid var(--edge); padding: 0 4px; }
   .bar { flex: 1 1 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; position: relative; outline: none; }
-  .bar div { width: 26px; max-width: 100%; }
-  .xlabels { display: flex; gap: 10px; padding: 0 4px; margin-top: -6px; } .xlabels span { flex: 1 1 0; text-align: center; font-size: 11px; color: var(--muted); }
+  .bar { min-width: 0; } .bar div { width: 70%; max-width: 26px; }
+  .xlabels { display: flex; gap: 10px; padding: 0 4px; margin-top: -6px; } .xlabels span { flex: 1 1 0; min-width: 0; text-align: center; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: visible; }
   .tip { display: none; } /* content for the floating #tooltip */
   #tooltip { position: fixed; z-index: 50; pointer-events: none; max-width: 300px; background: var(--bg); border: 1px solid var(--edge); border-radius: 6px;
     padding: 8px 10px; font-size: 12px; line-height: 1.5; box-shadow: 0 6px 18px #0009; }

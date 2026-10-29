@@ -1,7 +1,7 @@
 import { Preferences } from "@capacitor/preferences";
 import { startLoading } from "./loader.js";
 import { crest, explainer, rateChart } from "./extension/lib/crest.js";
-import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, validPeriod, setStatus, tenure, tier, TIERS } from "./extension/lib/stats.js";
+import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, pointLabel, tick, validPeriod, setStatus, tenure, tier, TIERS } from "./extension/lib/stats.js";
 import { renderTeam, loadTeam, rankCard } from "./team.js";
 import "./tooltip.js";
 
@@ -29,33 +29,38 @@ const rateText = (r, size = 18) => r.rate == null ? `<span class="mono muted" st
   : `<span class="mono" style="font-size:${size}px;font-weight:600;color:${tier(r.rate).c}">${r.rate}%</span> <span style="font-size:12px;font-weight:700;color:${tier(r.rate).c}">${tier(r.rate).name}</span>`;
 
 
-function mergedChart(weeks) {
-  const max = Math.max(1, ...weeks.map((w) => w.merged)), h = (n) => `${(n / max) * 140}px`;
-  return `<figure class="card"><figcaption><div style="font-weight:600">Merged PRs per week</div><div class="sub" style="margin-top:2px">Into develop · first try vs. needed changes</div></figcaption>
+// Bar and line charts over the chosen period (one point per day, week or month; see series()).
+const labelled = (i, n) => (n - 1 - i) % Math.max(1, Math.ceil(n / 7)) === 0; // ~7 evenly spaced ticks, always the last
+const ticks = (pts) => `<div class="xlabels">${pts.map((b, i) => `<span>${labelled(i, pts.length) ? tick(b) : ""}</span>`).join("")}</div>`;
+
+function mergedChart(pts, when) {
+  const max = Math.max(1, ...pts.map((b) => b.merged)), h = (n) => `${(n / max) * 140}px`;
+  return `<figure class="card"><figcaption><div style="font-weight:600">Merged PRs per ${pts[0]?.unit || "week"}</div><div class="sub" style="margin-top:2px">Into develop, ${when} · first try vs. needed changes</div></figcaption>
     <div class="legend"><span><i class="swatch" style="background:var(--accent)"></i>Silverback (first try)</span><span><i class="swatch" style="background:var(--redo)"></i>Needed changes</span></div>
-    <div class="bars">${weeks.map((w) => `<div class="bar" tabindex="0" aria-label="Week of ${day(w.start)}: ${w.merged} merged, ${w.first} first try">
-      <span class="mono" style="font-size:12px;margin-bottom:4px">${w.merged}</span>
-      ${w.merged - w.first ? `<div style="height:${h(w.merged - w.first)};background:var(--redo);border-radius:4px 4px 0 0"></div>` : ""}${w.first ? `<div style="height:${h(w.first)};background:var(--accent)${w.merged === w.first ? ";border-radius:4px 4px 0 0" : ""}"></div>` : ""}
-      <div class="tip"><div class="muted">Week of ${day(w.start)}</div><div>${w.merged} merged</div><div>${w.first} first try · ${w.merged - w.first} needed changes</div></div></div>`).join("")}</div>
-    <div class="xlabels">${weeks.map((w) => `<span>${day(w.start)}</span>`).join("")}</div></figure>`;
+    <div class="bars">${pts.map((b) => `<div class="bar" tabindex="0" aria-label="${pointLabel(b)}: ${b.merged} merged, ${b.first} first try">
+      ${pts.length <= 12 ? `<span class="mono" style="font-size:12px;margin-bottom:4px">${b.merged}</span>` : ""}
+      ${b.merged - b.first ? `<div style="height:${h(b.merged - b.first)};background:var(--redo);border-radius:4px 4px 0 0"></div>` : ""}${b.first ? `<div style="height:${h(b.first)};background:var(--accent)${b.merged === b.first ? ";border-radius:4px 4px 0 0" : ""}"></div>` : ""}
+      <div class="tip"><div class="muted">${pointLabel(b)}</div><div>${b.merged} merged</div><div>${b.first} first try · ${b.merged - b.first} needed changes</div></div></div>`).join("")}</div>
+    ${ticks(pts)}</figure>`;
 }
 
-function cycleChart(weeks) {
-  const pts = weeks.map((w, i) => ({ ...w, x: 50 + i * (290 / (weeks.length - 1)) }));
-  const known = pts.filter((p) => p.cycle != null);
-  const top = Math.max(3, Math.ceil(Math.max(0, ...known.map((p) => p.cycle)) / 3) * 3), y = (v) => 140 - (v / top) * 120;
+function cycleChart(pts, when) {
+  const n = pts.length, x = (i) => (n > 1 ? 50 + i * (290 / (n - 1)) : 195);
+  const known = pts.map((b, i) => ({ ...b, x: x(i) })).filter((b) => b.cycle != null);
+  const top = Math.max(3, Math.ceil(Math.max(0, ...known.map((b) => b.cycle)) / 3) * 3), y = (v) => 140 - (v / top) * 120;
   const last = known.at(-1), first = known[0];
   const delta = last && first && last !== first ? last.cycle - first.cycle : null;
-  return `<figure class="card"><figcaption><div style="font-weight:600">PR cycle time</div><div class="sub" style="margin-top:2px">Median days from opened to merged</div></figcaption>
+  return `<figure class="card"><figcaption><div style="font-weight:600">PR cycle time</div><div class="sub" style="margin-top:2px">Median days from opened to merged, per ${pts[0]?.unit || "week"}, ${when}</div></figcaption>
     <div style="display:flex;align-items:baseline;gap:8px"><span class="mono" style="font-size:28px;font-weight:600">${last ? `${last.cycle.toFixed(1)} d` : "—"}</span>
-      ${delta != null ? `<span style="font-size:12px;color:${delta <= 0 ? "var(--ok)" : "var(--redo)"}">${delta <= 0 ? "−" : "+"}${Math.abs(delta).toFixed(1)} d vs. ${day(first.start)}</span>` : ""}</div>
-    <svg viewBox="0 0 360 170" width="100%" role="img" aria-label="Median PR cycle time per week: ${known.map((p) => `${day(p.start)} ${p.cycle.toFixed(1)} days`).join(", ") || "no merges"}" style="display:block;overflow:visible">
+      ${delta != null ? `<span style="font-size:12px;color:${delta <= 0 ? "var(--ok)" : "var(--redo)"}">${delta <= 0 ? "−" : "+"}${Math.abs(delta).toFixed(1)} d vs. ${tick(first)}</span>` : ""}</div>
+    <svg viewBox="0 0 360 170" width="100%" role="img" aria-label="Median PR cycle time: ${known.map((b) => `${pointLabel(b)} ${b.cycle.toFixed(1)} days`).join(", ") || "no merges"}" style="display:block;overflow:visible">
       <g stroke="#21262D">${[0, 1, 2].map((i) => `<line x1="28" y1="${20 + i * 40}" x2="350" y2="${20 + i * 40}"/>`).join("")}</g>
       <line x1="28" y1="140" x2="350" y2="140" stroke="#30363D"/>
       <g fill="#9AA4B2" font-size="11" font-family="Inter, sans-serif" text-anchor="end">${[0, 1, 2, 3].map((i) => `<text x="20" y="${144 - i * 40}">${i ? `${(top / 3) * i}d` : "0"}</text>`).join("")}</g>
-      <g fill="#9AA4B2" font-size="11" font-family="Inter, sans-serif" text-anchor="middle">${pts.map((p) => `<text x="${p.x}" y="162">${day(p.start)}</text>`).join("")}</g>
-      <polyline points="${known.map((p) => `${p.x},${y(p.cycle)}`).join(" ")}" fill="none" stroke="#4C8DFF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-      <g fill="#4C8DFF" stroke="#161B22" stroke-width="2">${known.map((p) => `<circle cx="${p.x}" cy="${y(p.cycle)}" r="4.5" tabindex="0" data-tip="Week of ${day(p.start)}: ${p.cycle.toFixed(1)} days" aria-label="Week of ${day(p.start)}: ${p.cycle.toFixed(1)} days"/>`).join("")}</g>
+      <g fill="#9AA4B2" font-size="11" font-family="Inter, sans-serif" text-anchor="middle">${pts.map((b, i) => labelled(i, n) ? `<text x="${x(i)}" y="162">${tick(b)}</text>` : "").join("")}</g>
+      ${known.length > 1 ? `<polyline points="${known.map((b) => `${b.x},${y(b.cycle)}`).join(" ")}" fill="none" stroke="#4C8DFF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : ""}
+      <g fill="#4C8DFF" stroke="#161B22" stroke-width="2">${known.map((b) => `<circle cx="${b.x}" cy="${y(b.cycle)}" r="4.5" tabindex="0" data-tip="${pointLabel(b)}: ${b.cycle.toFixed(1)} days" aria-label="${pointLabel(b)}: ${b.cycle.toFixed(1)} days"/>`).join("")}</g>
+      ${known.length ? "" : `<text x="195" y="85" text-anchor="middle" fill="#9AA4B2" font-size="12" font-family="Inter, sans-serif">No merged PRs in this period</text>`}
     </svg></figure>`;
 }
 
@@ -73,7 +78,7 @@ function agesChart(prs, now) {
 
 function render(s) {
   showRepo(s.repo);
-  if (!s.mine) return; // cache from an older version
+  if (!s.mySeries?.[0] || !("merged" in s.mySeries[0])) return; // cache from an older version
   shown = s;
   for (const a of $("tabs").querySelectorAll("a")) a.toggleAttribute("aria-current", a.dataset.view === view());
   if (view() === "team") return route();
@@ -117,8 +122,8 @@ function render(s) {
   </section>
 
   <section aria-label="Trends" style="display:flex;flex-direction:column;gap:14px">
-    <h2 class="section-title">Trends <span class="muted" style="font-weight:500">· last 6 weeks</span></h2>
-    <div class="charts">${mergedChart(s.weeks)}${cycleChart(s.weeks)}${agesChart(s.myOpen, s.at)}</div>
+    <h2 class="section-title">Trends <span class="muted" style="font-weight:500">· ${periodLabel(s.period, s.at)}</span></h2>
+    <div class="charts">${mergedChart(s.mySeries, periodLabel(s.period, s.at))}${cycleChart(s.mySeries, periodLabel(s.period, s.at))}${agesChart(s.myOpen, s.at)}</div>
   </section>
 
   <div class="split">
