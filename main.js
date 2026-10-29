@@ -1,8 +1,8 @@
 import { Preferences } from "@capacitor/preferences";
 import { startLoading } from "./loader.js";
-import { crest } from "./extension/lib/crest.js";
+import { crest, explainer, rateChart } from "./extension/lib/crest.js";
 import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, validPeriod, setStatus, tenure, tier, TIERS } from "./extension/lib/stats.js";
-import { renderTeam, loadTeam } from "./team.js";
+import { renderTeam, loadTeam, rankCard } from "./team.js";
 
 // Kept in Preferences (Android SharedPreferences "CapacitorStorage"), which the home-screen widget also reads.
 const get = async (key) => (await Preferences.get({ key })).value;
@@ -24,7 +24,7 @@ const time = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute
 // Rate in its tier colour with the tier name in words (never colour alone); "—" and no crest when nothing merged.
 const rateText = (r, size = 18) => r.rate == null ? `<span class="mono muted" style="font-size:${size}px;font-weight:600">—</span>`
   : `<span class="mono" style="font-size:${size}px;font-weight:600;color:${tier(r.rate).c}">${r.rate}%</span> <span style="font-size:12px;font-weight:700;color:${tier(r.rate).c}">${tier(r.rate).name}</span>`;
-const rankBox = (r) => `<div class="rank">${crest(r.rate, 36)}<div><div class="muted" style="font-size:12px">Silverback rate</div><div>${rateText(r)}</div></div></div>`;
+
 
 function mergedChart(weeks) {
   const max = Math.max(1, ...weeks.map((w) => w.merged)), h = (n) => `${(n / max) * 140}px`;
@@ -90,7 +90,7 @@ function render(s) {
     <p class="muted" style="margin:4px 0 0">Your activity on ${repoName} ${periodLabel(s.period, s.at)}${s.firstInOrg ? ` · ${tenure(s.firstInOrg, s.at)} at ${org}` : ""}</p>
   </div>${s.orgLogo ? `<img class="org-logo" src="${esc(s.orgLogo)}" alt="${org} logo" title="${org}">` : ""}</div>
 
-  <section class="stats" aria-label="Your stats">
+  <section class="mystats" aria-label="Your stats">
     <div class="card wide">
       <div class="rate-head">
         <div><div class="label">Merged PRs</div><div class="mono" style="font-size:44px;font-weight:600;line-height:1.1;margin-top:4px">${s.myMerged}</div></div>
@@ -103,8 +103,16 @@ function render(s) {
           <div style="width:${r.rate ?? 0}%;background:${t ? t.c : "transparent"}"></div><i style="left:30%"></i><i style="left:60%"></i><i style="left:90%"></i></div>
         <div class="tiers">${[...TIERS].reverse().map((x) => `<span>${x.min === 90 ? "King" : x.name}</span>`).join("")}</div></div>
     </div>
-    <div class="card"><div class="label">Open PRs</div><div class="mono big">${open}</div><div class="sub">+ ${drafts} draft${drafts === 1 ? "" : "s"}</div></div>
-    <div class="card"><div class="label">Issues assigned</div><div class="mono big">${s.myIssues.length}</div><div class="sub">${s.newIssues} new ${s.since ? "this period" : "overall"}</div></div>
+    <div class="side">
+      <div class="pair">
+        <div class="card small"><div class="label">Open PRs</div><div class="mono">${open}</div><div class="sub">+ ${drafts} draft${drafts === 1 ? "" : "s"}</div></div>
+        <div class="card small"><div class="label">Issues assigned</div><div class="mono">${s.myIssues.length}</div><div class="sub">${s.newIssues} new ${s.period === "0" ? "overall" : "this period"}</div></div>
+      </div>
+      ${rateChart(s.mySeries, "Your Silverback rate", `Your PRs merged into develop, ${periodLabel(s.period, s.at)}`)}
+    </div>
+  </section>
+  <section class="rankcards" aria-label="Silverback rate of the repository and the organization">
+    ${rankCard(`Silverback rate · ${repoName}`, s.repoRate)}${rankCard(`Silverback rate · ${org}`, s.orgRate)}
   </section>
 
   <section aria-label="Trends" style="display:flex;flex-direction:column;gap:14px">
@@ -131,7 +139,6 @@ function render(s) {
           <div><div class="mono">${s.prs}</div><div class="muted">Open PRs</div></div>
           <div><div class="mono">${s.issues}</div><div class="muted">Open issues</div></div>
           <div><div class="mono">${s.stars}</div><div class="muted">Star${s.stars === 1 ? "" : "s"}</div></div></div>
-        ${rankBox(s.repoRate)}
         <div class="sub" style="margin-top:16px">Your share of open PRs</div>
         <div class="meter" style="height:6px;margin-top:6px" role="img" aria-label="${s.myOpen.length} of ${s.prs} open PRs are yours"><div style="width:${s.prs ? (s.myOpen.length / s.prs) * 100 : 0}%"></div></div>
         <div style="margin-top:6px;font-size:12px"><span class="mono">${s.myOpen.length}</span><span class="muted"> of ${s.prs} incl. drafts</span></div>
@@ -140,7 +147,7 @@ function render(s) {
         <div class="mini" style="grid-template-columns:repeat(2,minmax(0,1fr))">
           <div><div class="mono">${s.orgRepos}</div><div class="muted">Repositories</div></div>
           <div><div class="mono">${s.orgPrs}</div><div class="muted">Open PRs</div></div></div>
-        ${rankBox(s.orgRate)}
+
         <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px">${(s.langs ? s.langs.split(", ") : []).map((l) => `<span class="chip">${esc(l)}</span>`).join("")}</div>
       </section>
     </aside>
@@ -318,6 +325,13 @@ repoPicker.addEventListener("click", async (e) => {
 });
 period.addEventListener("change", async () => { await set("period", period.value); refresh(); });
 $("refresh").addEventListener("click", () => refresh());
+// Any crest opens the card that explains the Silverback rate.
+document.addEventListener("click", (e) => {
+  if (!e.target.closest?.("[data-explain]")) return;
+  $("explain").innerHTML = explainer();
+  $("explain").showModal();
+});
+$("explain").addEventListener("click", (e) => { if (e.target === $("explain")) $("explain").close(); }); // click outside the card
 // Close an open menu when tapping elsewhere.
 document.addEventListener("click", (e) => { for (const d of [repoPicker, tokenPicker]) if (!d.contains(e.target)) d.open = false; });
 

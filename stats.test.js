@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, weeks, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam } from "./extension/lib/stats.js";
+import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, weeks, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam, rateSeries } from "./extension/lib/stats.js";
 
 const rev = (...states) => ({ nodes: states.map((state, i) => ({ state, submittedAt: `2026-10-0${i + 1}T10:00:00Z`, author: { login: "rev" } })) });
 const base = (extra = {}) => ({
@@ -85,4 +85,15 @@ test("summarizeTeam: per-member merged, reviews given and rate", () => {
   const t = summarizeTeam(prs, [{ role: "ADMIN", node: { login: "bo", avatarUrl: "" } }, { role: "MEMBER", node: { login: "idle", avatarUrl: "" } }], "30", now);
   const row = (l) => t.rows.find((m) => m.login === l);
   assert.deepEqual([t.rows.length, row("ana").merged, row("ana").rate, row("bo").reviews, row("bo").open, row("bo").owner, t.rate.rate, t.merged], [2, 2, 50, 3, 1, true, 50, 2]);
+});
+
+test("rateSeries buckets by day, week or month with the period", () => {
+  const now = new Date(2026, 9, 29, 15), at = (d) => new Date(2026, 9, d, 12).toISOString();
+  const pr = (d, ...st) => ({ mergedAt: at(d), reviews: rev(...st) });
+  const prs = [pr(27, "APPROVED"), pr(27, "CHANGES_REQUESTED", "APPROVED"), pr(28, "APPROVED"), pr(20, "APPROVED")];
+  const week = rateSeries(prs, periodStart(now, "w"), now);
+  assert.deepEqual([week[0].unit, week.length, week.map((b) => b.rate)], ["day", 4, [null, 50, 100, null]]);
+  const month = rateSeries(prs, periodStart(now, "30"), now);
+  assert.deepEqual([month[0].unit, month.at(-1).rate, month.at(-2).rate], ["week", 67, 100]);
+  assert.equal(rateSeries(prs, periodStart(now, "0"), now)[0].unit, "day"); // overall starts at the first merge (20 Oct)
 });

@@ -11,8 +11,8 @@ export const QUERY = `query($owner:String!,$name:String!,$org:String!,$qOpen:Str
   myIssues: search(query:$qIssues,type:ISSUE,first:100){ nodes{ ... on Issue { number title url createdAt closedByPullRequestsReferences(first:1){ nodes{ number } }
     projectItems(first:5){ nodes{ id project{ id } fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue{ name optionId field{ ... on ProjectV2SingleSelectField{ id options{ id name } } } } } } } } } }
   myDevelop: search(query:$qDevelop,type:ISSUE,first:100){ nodes{ ... on PullRequest { createdAt mergedAt ${REVIEWS} } } }
-  repoMerged: search(query:$qRepo,type:ISSUE,first:100){ nodes{ ... on PullRequest { ${REVIEWS} } } }
-  orgMerged: search(query:$qOrg,type:ISSUE,first:100){ nodes{ ... on PullRequest { ${REVIEWS} } } }
+  repoMerged: search(query:$qRepo,type:ISSUE,first:100){ nodes{ ... on PullRequest { mergedAt ${REVIEWS} } } }
+  orgMerged: search(query:$qOrg,type:ISSUE,first:100){ nodes{ ... on PullRequest { mergedAt ${REVIEWS} } } }
 }`;
 
 // Silverback rate: a merged PR is "first try" when no CHANGES_REQUESTED review came before its first APPROVED one.
@@ -99,6 +99,27 @@ export function weeks(prs, now, n = 6) {
   });
 }
 
+// Silverback rate over the period, for the rate charts: by day up to 2 weeks, by week up to ~6 months, else by month
+// (at most 24 points, the most recent). Overall starts at the first merge. A bucket with no merges has rate null.
+export function rateSeries(prs, since, now) {
+  const first = prs.reduce((m, p) => Math.min(m, new Date(p.mergedAt)), now);
+  const start = new Date(+since ? since : first), span = (now - start) / 864e5; // overall (epoch) starts at the first merge
+  const unit = span <= 14 ? "day" : span <= 182 ? "week" : "month";
+  const floor = (t) => {
+    const d = new Date(t); d.setHours(0, 0, 0, 0);
+    if (unit === "week") return monday(d);
+    if (unit === "month") d.setDate(1);
+    return d;
+  };
+  const next = (d) => { const n = new Date(d); unit === "day" ? n.setDate(n.getDate() + 1) : unit === "week" ? n.setDate(n.getDate() + 7) : n.setMonth(n.getMonth() + 1); return n; };
+  const out = [];
+  for (let b = floor(start); b <= now; b = next(b)) {
+    const inB = prs.filter((p) => new Date(p.mergedAt) >= b && new Date(p.mergedAt) < next(b) && new Date(p.mergedAt) >= since);
+    out.push({ start: b.getTime(), unit, ...silverbackRate(inB) });
+  }
+  return out.slice(-24);
+}
+
 // "Side-eye": things waiting on you. Stale drafts, PRs nobody reviewed yet, issues ready for dev.
 export function sideEye(s) {
   const age = (t) => Math.floor((s.at - new Date(t)) / 864e5);
@@ -140,6 +161,7 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
     }).sort((a, b) => a.rank - b.rank),
     myMerged: data.myMerged.issueCount,
     mine, repoRate: silverbackRate(data.repoMerged.nodes), orgRate: silverbackRate(data.orgMerged.nodes),
+    mySeries: rateSeries(data.myDevelop.nodes, since, now), repoSeries: rateSeries(data.repoMerged.nodes, since, now), orgSeries: rateSeries(data.orgMerged.nodes, since, now),
     newIssues: data.myIssues.nodes.filter((i) => recent(i.createdAt)).length,
     weeks: weeks(data.myDevelop.nodes, now),
     // ponytail: GitHub only exposes org join dates to admins, so tenure starts at the first PR or issue you opened in the org.
@@ -239,7 +261,7 @@ export function summarizeTeam(prs, members, period = DEFAULT_PERIOD, now = Date.
 
   return {
     at: now, period, since: since.getTime(), rows, alerts,
-    rate: silverbackRate(inPeriod), merged: inPeriod.length, cycle: teamCycle,
+    rate: silverbackRate(inPeriod), series: rateSeries(inPeriod, since, now), merged: inPeriod.length, cycle: teamCycle,
     open: prs.filter((p) => p.state === "OPEN").length, reviews: rows.reduce((n, m) => n + m.reviews, 0),
     weeks: weeks(merged, now).map((w) => ({ start: w.start, total: w.merged })),
   };

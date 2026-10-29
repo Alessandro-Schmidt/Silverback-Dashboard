@@ -55,6 +55,13 @@
   .privacy { font-size: 11px; line-height: 1.5; margin: 0; }
   :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
   [hidden] { display: none !important; }
+  .crest-btn { background: none; border: 0; padding: 0; cursor: help; line-height: 0; }
+  dialog.explain { width: 340px; max-height: 540px; box-sizing: border-box; background: var(--card); color: var(--fg); border: 1px solid var(--edge); border-radius: 12px; padding: 18px; line-height: 1.5; font-size: 12px; }
+  dialog.explain::backdrop { background: rgba(13, 17, 23, .7); }
+  dialog.explain p { color: #C9D1D9; margin: 8px 0; } dialog.explain h2 { font-size: 16px !important; }
+  .tier-list { list-style: none; padding: 0; margin: 10px 0 14px; display: grid; gap: 8px; }
+  .tier-list li { display: flex; align-items: center; gap: 10px; } .tier-list li > span { display: flex; flex-direction: column; line-height: 1.3; }
+  .explain-close { min-height: 34px; width: 100%; background: var(--accent); color: var(--bg); font-weight: 700; border: 0; border-radius: 8px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -88,6 +95,7 @@
 <footer><span id="updated" class="muted" style="font-size:11px"></span><div class="spacer"></div>
   <a class="open" href="https://alessandro-schmidt.github.io/Silverback-Dashboard/" target="_blank" rel="noopener">Open dashboard
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg></a></footer>
+<dialog id="explain" class="explain" aria-label="What is the Silverback rate?"></dialog>
 <script type="module" src="popup.js"></script>
 </body>
 </html>

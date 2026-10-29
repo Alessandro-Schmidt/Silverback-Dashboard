@@ -176,8 +176,27 @@
   .owner-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #2B2112; color: #E3B341; white-space: nowrap; }
   .you-chip { background: #172A4A; color: var(--link); }
   .team-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-  .rankcards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 720px) { .rankcards { grid-template-columns: 1fr; } }
+  .rankcards, .rankrow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+  @media (max-width: 720px) { .rankcards, .rankrow { grid-template-columns: 1fr; } }
+
+  /* My stats: merged + rate on the left; open PRs and issues (smaller) with the rate chart under them on the right */
+  .mystats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+  .mystats .wide { display: flex; flex-direction: column; justify-content: space-between; gap: 16px; }
+  .mystats .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card.small { padding: 14px 18px; } .card.small .mono { font-size: 26px; font-weight: 600; line-height: 1.2; margin-top: 2px; } .card.small .sub { margin-top: 2px; }
+  @media (max-width: 900px) { .mystats { grid-template-columns: 1fr; } }
+  .ratechart { margin: 0; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* Crest = button that opens the explainer */
+  .crest-btn { background: none; border: 0; padding: 0; cursor: help; border-radius: 8px; flex: none; line-height: 0; }
+  .crest-btn:hover .crest { filter: brightness(1.12); }
+  dialog.explain { max-width: 460px; width: calc(100vw - 32px); box-sizing: border-box; background: var(--card); color: var(--fg); border: 1px solid var(--edge); border-radius: 14px; padding: 24px; line-height: 1.55; }
+  dialog.explain::backdrop { background: rgba(13, 17, 23, .7); backdrop-filter: blur(3px); }
+  dialog.explain p { color: #C9D1D9; } dialog.explain code { font-family: "JetBrains Mono", monospace; font-size: 12px; }
+  .tier-list { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 10px; }
+  .tier-list li { display: flex; align-items: center; gap: 12px; } .tier-list li > span { display: flex; flex-direction: column; line-height: 1.3; }
+  .explain-close { min-height: 40px; width: 100%; background: var(--accent); color: var(--bg); font-weight: 700; border: 0; border-radius: 8px; cursor: pointer; }
   .rankcard { display: flex; align-items: center; gap: 24px; padding: 22px 28px; }
   /* Review balance and merged-per-week get the room; all three cards share one height */
   .team-charts { display: grid; grid-template-columns: 1.4fr 1.4fr 1fr; gap: 16px; align-items: stretch; }
@@ -236,6 +255,7 @@
     </ul>
   </section>
 </main>
+<dialog id="explain" class="explain" aria-label="What is the Silverback rate?"></dialog>
 <div id="loader" class="sb-overlay" hidden>
   <div class="ld-mark">
     <span class="sb-ring" aria-hidden="true"></span><span class="sb-ring sb-ring2" aria-hidden="true"></span>

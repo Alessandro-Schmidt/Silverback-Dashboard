@@ -1,6 +1,6 @@
 // Team view (design board "Team"), open to everyone: the repo's and org's Silverback rate,
 // team totals, merged per week, review balance, things that need attention, and a sortable members table.
-import { crest } from "./extension/lib/crest.js";
+import { crest, rateChart } from "./extension/lib/crest.js";
 import { fetchTeam, periodLabel, tier } from "./extension/lib/stats.js";
 
 const esc = (v) => String(v).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -17,7 +17,7 @@ export async function loadTeam(token, s) {
 export function renderTeam(el, s) {
   host = el, stats = s;
   team = cache.get(`${s.repo}|${s.period}`) || null;
-  if (!team) { el.innerHTML = `<div class="sk" style="height:60px;width:320px"></div><div class="rankcards"><div class="sk" style="height:130px"></div><div class="sk" style="height:130px"></div></div><div class="team-stats">${'<div class="sk" style="height:120px"></div>'.repeat(5)}</div><div class="sk" style="height:420px"></div>`; return; }
+  if (!team) { el.innerHTML = `<div class="sk" style="height:60px;width:320px"></div><div class="rankrow"><div class="sk" style="height:220px"></div><div class="sk" style="height:220px"></div></div><div class="rankrow"><div class="sk" style="height:220px"></div><div class="sk" style="height:220px"></div></div><div class="team-stats">${'<div class="sk" style="height:120px"></div>'.repeat(5)}</div><div class="sk" style="height:420px"></div>`; return; }
   draw();
 }
 
@@ -26,13 +26,17 @@ const rateCell = (rate) => rate == null ? `<span class="mono muted">—</span>`
 const avatar = (m, size = 36) => m.avatar ? `<img class="av" src="${esc(m.avatar)}" alt="" width="${size}" height="${size}" style="width:${size}px;height:${size}px">`
   : `<span class="av" style="width:${size}px;height:${size}px;font-size:${size / 2.8}px;background:#4C8DFF">${esc(m.login.slice(0, 2).toUpperCase())}</span>`;
 
-function draw() {
-  const t = team, s = stats, repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
-  const rankCard = (label, r) => `<div class="card rankcard">${crest(r.rate, 84) || `<span style="width:84px"></span>`}<div>
+// A Silverback rate card with a big crest (shared with the My stats page).
+export const rankCard = (label, r) => `<div class="card rankcard">${crest(r.rate, 84) || `<span style="width:84px"></span>`}<div>
     <div class="label" style="font-size:14px">${label}</div>
     ${r.rate == null ? `<div class="mono muted" style="font-size:40px;font-weight:600">—</div><div class="sub" style="margin-top:0">nothing merged yet</div>`
       : `<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:12px"><span class="mono" style="font-size:44px;font-weight:600;line-height:1.15;color:${tier(r.rate).c}">${r.rate}%</span><span style="font-size:16px;font-weight:700;color:${tier(r.rate).c}">${tier(r.rate).name}</span></div>
         <div class="sub" style="margin-top:2px">${r.first} of ${r.total} merged PRs approved on the first review</div>`}</div></div>`;
+
+function draw() {
+  const t = team, s = stats, repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
+  // Each rate gets half a line, with its chart over the chosen period beside it.
+  const rankRow = (label, r, series, who) => `<div class="rankrow">${rankCard(label, r)}${rateChart(series, `${label} over time`, `${who}, ${periodLabel(t.period, t.at)}`)}</div>`;
   const stat = (label, value, sub) => `<div class="card" style="padding:20px 22px"><div class="label" style="font-size:14px">${label}</div><div class="mono" style="font-size:38px;font-weight:600;line-height:1.2;margin-top:4px">${value}</div><div class="sub" style="margin-top:4px">${sub}</div></div>`;
 
   const wmax = Math.max(1, ...t.weeks.map((w) => w.total));
@@ -91,7 +95,8 @@ function draw() {
       <div><h1 style="font-size:26px;font-weight:700;letter-spacing:-.01em">Team performance</h1>
         <p class="muted" style="margin:4px 0 0">${org} · ${repoName} · ${t.rows.length} active member${t.rows.length === 1 ? "" : "s"} ${periodLabel(t.period, t.at)}</p></div>
       </div>
-    <div class="rankcards">${rankCard(`Silverback rate · ${repoName}`, t.rate)}${rankCard(`Silverback rate · ${org}`, s.orgRate)}</div>
+    ${rankRow(`Silverback rate · ${repoName}`, t.rate, t.series, "Every author's PRs merged into develop")}
+    ${rankRow(`Silverback rate · ${org}`, s.orgRate, s.orgSeries, "PRs merged across the organization")}
     <section class="team-stats" aria-label="Team stats">
       ${stat("Merged PRs", t.merged, "all members, into develop")}
       ${stat("Median cycle time", t.cycle == null ? "—" : `${t.cycle.toFixed(1)} d`, "opened → merged")}

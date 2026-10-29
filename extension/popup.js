@@ -1,4 +1,4 @@
-import { crest, mark } from "./lib/crest.js";
+import { crest, explainer, mark } from "./lib/crest.js";
 import { listOrgs, listRepos, PERIOD_ORDER, periodOption, sideEye, tier, toNextTier, validPeriod } from "./lib/stats.js";
 
 const $ = (id) => document.getElementById(id);
@@ -61,6 +61,11 @@ async function refresh() {
   render();
 }
 $("refresh").addEventListener("click", refresh);
+// The crest opens the card that explains the Silverback rate.
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-explain]")) $("explain").innerHTML = explainer(), $("explain").showModal();
+  else if (e.target === $("explain")) $("explain").close();
+});
 $("period").addEventListener("change", async () => { await store.set({ period: $("period").value }); refresh(); });
 
 // Settings: the token unlocks the org list, the org unlocks its repos.
