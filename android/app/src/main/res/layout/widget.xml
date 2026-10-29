@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="12dp" android:background="@drawable/widget_bg">
+    <TextView android:id="@+id/num" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textSize="36sp" android:textStyle="bold" android:textColor="@color/ghero_fg" />
+    <TextView android:id="@+id/label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textStyle="bold" android:textColor="@color/ghero_fg" />
+    <TextView android:id="@+id/sub" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textSize="12sp" android:maxLines="1" android:ellipsize="end" android:textColor="@color/ghero_muted" />
+</LinearLayout>

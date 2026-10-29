@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ghero_tile">#FFFFFF</color>
+    <color name="ghero_fg">#1F2328</color>
+    <color name="ghero_muted">#656D76</color>
+</resources>
