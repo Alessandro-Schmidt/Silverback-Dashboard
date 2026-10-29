@@ -1,8 +1,6 @@
-<p align="center"><img src="public/icon-tile.svg" alt="Silverback logo" width="128"></p>
+# Silverback
 
-<h1 align="center">Silverback</h1>
-
-<p align="center"><em>Ship like you mean it.</em></p>
+*Ship like you mean it.*
 
 A personal productivity dashboard on top of GitHub: the PRs you opened and merged, how many were approved on
 the first review, how long they waited, your 6-week trends, and your assigned issues on a board you can drag
