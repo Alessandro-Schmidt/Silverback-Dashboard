@@ -6,17 +6,18 @@
     "dev": "vite",
     "build": "vite build",
     "test": "node --test",
-    "android": "vite build && cap sync android && cap open android"
+    "android": "vite build && cap sync android && cap open android",
+    "build:extension": "node extension/build.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Silverback-Corp/Silverback-Dashboard.git"
+    "url": "git+https://github.com/Alessandro-Schmidt/Silverback-Dashboard.git"
   },
   "type": "module",
   "bugs": {
-    "url": "https://github.com/Silverback-Corp/Silverback-Dashboard/issues"
+    "url": "https://github.com/Alessandro-Schmidt/Silverback-Dashboard/issues"
   },
-  "homepage": "https://github.com/Silverback-Corp/Silverback-Dashboard#readme",
+  "homepage": "https://github.com/Alessandro-Schmidt/Silverback-Dashboard#readme",
   "dependencies": {
     "@capacitor/android": "8.6.0",
     "@capacitor/core": "8.6.0",

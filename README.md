@@ -38,6 +38,19 @@ and sign in once. Then long-press the home screen, open **Widgets**, find **Silv
 The widget code is `android/app/src/main/java/io/silverback/app/SilverbackWidget.java`. Its colours follow the
 system light or dark theme (`res/values*/silverback_colors.xml`).
 
+## Browser extension (Edge, Chrome)
+
+A toolbar badge with your open PR count, and a popup with your stats and open PRs. It refreshes every 30 minutes
+in the background and shares `stats.js` with the dashboard, so the numbers always match.
+
+```bash
+npm run build:extension
+```
+
+Then open `edge://extensions` (or `chrome://extensions`), turn on **Developer mode**, click **Load unpacked**
+and pick the `dist-extension/` folder. Click the Silverback icon, paste your token, and pick the organization,
+repository and period. The code is in `extension/`.
+
 ## Not built yet
 
 - iOS WidgetKit: needs a Mac, plus an App Group shared between the app and the widget.

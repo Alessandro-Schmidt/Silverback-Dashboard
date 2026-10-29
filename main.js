@@ -187,7 +187,7 @@ app.addEventListener("drop", async (e) => {
   status.textContent = "Moving issue…";
   try {
     await setStatus(await get("token"), issue.move, col.dataset.option);
-    await refresh(true);
+    await refresh();
   } catch (err) {
     from.append(card);
     status.textContent = `Couldn't move the issue (${err.message})`;
@@ -197,20 +197,21 @@ app.addEventListener("drop", async (e) => {
 // Loading keeps the last data on screen (or skeletons when there is none); a failure shows a banner with Retry.
 const SKELETON = `<div class="sk" style="height:60px;width:320px"></div><div class="stats">${'<div class="sk" style="height:130px"></div>'.repeat(3)}</div>
   <div class="charts">${'<div class="sk" style="height:300px"></div>'.repeat(3)}</div><div class="sk" style="height:320px"></div>`;
-// `quiet` skips the loading overlay (used after moving an issue). One refresh at a time.
+// The loading overlay only shows for a new context: connecting a token, switching organization or repo.
+// Page loads, the refresh button, period changes and issue moves refresh silently. One refresh at a time.
 let busy = false;
-async function refresh(quiet) {
+async function refresh(animate) {
   if (busy) return;
   busy = true;
-  try { await load(quiet); } finally { busy = false; }
+  try { await load(animate); } finally { busy = false; }
 }
-async function load(quiet) {
+async function load(animate) {
   const [token, repo, org, p] = await Promise.all(["token", "repo", "org", "period"].map(get));
   if (!token || !repo) return;
   $("banner").hidden = true;
   if (!shown) app.innerHTML = SKELETON;
   status.textContent = "Refreshing…";
-  const finish = quiet === true ? async () => {} : startLoading(repo.split("/")[1]);
+  const finish = animate === true ? startLoading(repo.split("/")[1]) : async () => {};
   try {
     const s = await fetchStats(token, repo, org, p || "30");
     await set("stats", JSON.stringify(s));
@@ -262,7 +263,7 @@ repoPicker.addEventListener("click", async (e) => {
     o.setAttribute("aria-current", "");
     await set("org", o.dataset.org);
     await set("repo", await fillRepos(o.dataset.org));
-    return refresh();
+    return refresh(true);
   }
   const b = e.target.closest("button[data-repo]");
   if (!b) return;
@@ -271,7 +272,7 @@ repoPicker.addEventListener("click", async (e) => {
   b.setAttribute("aria-current", "");
   showRepo(b.dataset.repo);
   await set("repo", b.dataset.repo);
-  refresh();
+  refresh(true);
 });
 period.addEventListener("change", async () => { await set("period", period.value); refresh(); });
 $("refresh").addEventListener("click", () => refresh());
@@ -290,7 +291,7 @@ for (const f of [form, $("welcome-form")]) f.addEventListener("submit", async (e
   f.token.value = "", tokenPicker.open = false, showToken(true);
   document.body.classList.remove("first-run");
   await loadPickers();
-  refresh();
+  refresh(true);
 });
 
 const cached = await get("stats");

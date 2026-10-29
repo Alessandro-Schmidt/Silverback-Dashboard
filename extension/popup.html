@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Silverback</title>
+<style>
+  :root { --bg: #0D1117; --card: #161B22; --line: #21262D; --edge: #30363D; --fg: #E6EDF3; --muted: #9AA4B2; --dim: #6E7681;
+    --accent: #4C8DFF; --redo: #D07A2A; --link: #8AB4FF; --ok: #56D364; color-scheme: dark; }
+  body { margin: 0; width: 380px; background: var(--bg); color: var(--fg); font: 13px "Segoe UI", system-ui, sans-serif; }
+  a { color: var(--fg); text-decoration: none; } a:hover { color: var(--link); text-decoration: underline; }
+  button, select, input { font: inherit; color: var(--fg); }
+  .mono { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; }
+  .muted { color: var(--muted); }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  header img { width: 28px; height: 28px; }
+  header .name { font-weight: 800; font-size: 15px; letter-spacing: -.02em; line-height: 1.1; }
+  header .repo { font-size: 11px; }
+  header .tools { margin-left: auto; display: flex; gap: 6px; }
+  .icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--card); border: 1px solid var(--edge); border-radius: 8px; cursor: pointer; }
+  main { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .num { font-size: 24px; font-weight: 600; line-height: 1.2; }
+  .label { color: var(--muted); font-size: 12px; }
+  .meter { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 6px; } .meter div { height: 100%; background: var(--accent); }
+  h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .pr { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .pr a { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--line); color: #B1BAC4; }
+  .chip.open { background: #12301D; color: var(--ok); }
+  footer { display: flex; justify-content: space-between; padding: 0 14px 12px; font-size: 11px; }
+  .error { color: #E3B341; }
+  form { display: flex; flex-direction: column; gap: 10px; }
+  label { font-weight: 600; font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
+  input, select { min-height: 34px; padding: 0 10px; background: var(--card); border: 1px solid var(--edge); border-radius: 8px; font-weight: 400; }
+  .primary { min-height: 36px; background: var(--accent); color: #0D1117; font-weight: 600; border: 0; border-radius: 8px; cursor: pointer; }
+  .privacy { font-size: 11px; line-height: 1.5; }
+  :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <img src="icons/icon-48.png" alt="">
+  <div><div class="name">Silverback</div><div class="repo muted" id="where">Ship like you mean it.</div></div>
+  <div class="tools">
+    <button class="icon" id="refresh" type="button" aria-label="Refresh" title="Refresh"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
+    <button class="icon" id="gear" type="button" aria-label="Settings" title="Settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+</header>
+
+<main id="view" hidden></main>
+
+<main id="setup" hidden>
+  <form id="form">
+    <label>GitHub personal access token<input name="token" type="password" autocomplete="off" placeholder="github_pat_… or ghp_…"></label>
+    <label>Organization<select name="org" disabled><option>Paste a token first</option></select></label>
+    <label>Repository<select name="repo" disabled></select></label>
+    <label>Period<select name="period">
+      <option value="30">Last 30 working days</option><option value="10">Last 10 working days</option><option value="q">This quarter</option><option value="0">Overall</option>
+    </select></label>
+    <button class="primary">Save</button>
+    <p id="setup-error" class="error" hidden></p>
+  </form>
+  <p class="privacy muted">No data is collected: there is no server and no database. Your token and stats stay in this browser,
+    which talks to GitHub directly. Needs read access to Metadata, Pull requests, Issues and Projects.</p>
+</main>
+
+<footer><span id="updated" class="muted"></span><span id="error" class="error"></span></footer>
+<script type="module" src="popup.js"></script>
+</body>
+</html>
