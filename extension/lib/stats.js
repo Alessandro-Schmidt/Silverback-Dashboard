@@ -10,7 +10,7 @@ export const QUERY = `query($owner:String!,$name:String!,$org:String!,$qOpen:Str
   myMerged: search(query:$qMerged,type:ISSUE,first:1){ issueCount }
   myIssues: search(query:$qIssues,type:ISSUE,first:100){ nodes{ ... on Issue { number title url createdAt closedByPullRequestsReferences(first:1){ nodes{ number } }
     projectItems(first:5){ nodes{ id project{ id } fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue{ name optionId field{ ... on ProjectV2SingleSelectField{ id options{ id name } } } } } } } } } }
-  myDevelop: search(query:$qDevelop,type:ISSUE,first:100){ nodes{ ... on PullRequest { createdAt mergedAt ${REVIEWS} } } }
+  myDevelop: search(query:$qDevelop,type:ISSUE,first:100){ nodes{ ... on PullRequest { createdAt mergedAt additions deletions ${REVIEWS} } } }
   repoMerged: search(query:$qRepo,type:ISSUE,first:100){ nodes{ ... on PullRequest { mergedAt ${REVIEWS} } } }
   orgMerged: search(query:$qOrg,type:ISSUE,first:100){ nodes{ ... on PullRequest { mergedAt ${REVIEWS} } } }
 }`;
@@ -140,7 +140,7 @@ export function sideEye(s) {
 export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.now()) {
   period = validPeriod(period);
   const since = periodStart(now, period), recent = (t) => new Date(t) >= since;
-  const mine = silverbackRate(data.myDevelop.nodes.filter((p) => recent(p.mergedAt)));
+  const mergedMine = data.myDevelop.nodes.filter((p) => recent(p.mergedAt)), mine = silverbackRate(mergedMine);
   const r = data.repository, o = data.organization.repositories;
   const langs = {};
   for (const n of o.nodes) for (const e of n.languages.edges) langs[e.node.name] = (langs[e.node.name] || 0) + e.size; // bytes
@@ -160,6 +160,8 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
         move: v ? { project: item.project.id, item: item.id, field: v.field.id, optionId: v.optionId, options: v.field.options } : null, rank: v ? v.field.options.findIndex((o) => o.id === v.optionId) : Infinity };
     }).sort((a, b) => a.rank - b.rank),
     myMerged: data.myMerged.issueCount,
+    // Lines added and removed by your PRs merged into develop in the period (GitHub's green ++ and red --).
+    lines: mergedMine.reduce((l, p) => ({ added: l.added + (p.additions || 0), removed: l.removed + (p.deletions || 0) }), { added: 0, removed: 0 }),
     mine, repoRate: silverbackRate(data.repoMerged.nodes), orgRate: silverbackRate(data.orgMerged.nodes),
     mySeries: rateSeries(data.myDevelop.nodes, since, now), repoSeries: rateSeries(data.repoMerged.nodes, since, now), orgSeries: rateSeries(data.orgMerged.nodes, since, now),
     newIssues: data.myIssues.nodes.filter((i) => recent(i.createdAt)).length,

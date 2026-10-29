@@ -179,13 +179,15 @@
   .rankcards, .rankrow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
   @media (max-width: 720px) { .rankcards, .rankrow { grid-template-columns: 1fr; } }
 
-  /* My stats: merged + rate on the left; open PRs and issues (smaller) with the rate chart under them on the right */
+  /* My stats: four stat cards on top; the rate badge card (left) and its chart (right) under them */
   .mystats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
-  .mystats .wide { display: flex; flex-direction: column; justify-content: space-between; gap: 16px; }
-  .mystats .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .quad { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   .card.small { padding: 14px 18px; } .card.small .mono { font-size: 26px; font-weight: 600; line-height: 1.2; margin-top: 2px; } .card.small .sub { margin-top: 2px; }
-  @media (max-width: 900px) { .mystats { grid-template-columns: 1fr; } }
+  .card.small .lines { display: flex; flex-direction: column; font-size: 17px; line-height: 1.35; margin-top: 4px; }
+  .lines .add { color: #3FB950; } .lines .del { color: #F85149; }
+  .ratecard { display: flex; flex-direction: column; justify-content: space-between; gap: 18px; }
+  .ratecard .rate { display: flex; align-items: center; gap: 24px; }
+  @media (max-width: 900px) { .mystats { grid-template-columns: 1fr; } .quad { grid-template-columns: 1fr 1fr; } }
   .ratechart { margin: 0; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
 
   /* Crest = button that opens the explainer */

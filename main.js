@@ -19,6 +19,8 @@ const hidden = (name) => /^(new|done|to test (in|on) uat)$/.test(name.toLowerCas
 const COLUMN_COLORS = ["#8B949E", "#58A6FF", "#E3B341", "#BC8CFF", "#39C5BB", "#F778BA", "#56D364"];
 
 period.innerHTML = PERIOD_ORDER.map((v) => `<option value="${v}">${periodOption(v)}</option>`).join("");
+// "28 075": thousands separated by a space.
+const num = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 const time = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 // Rate in its tier colour with the tier name in words (never colour alone); "—" and no crest when nothing merged.
@@ -91,25 +93,23 @@ function render(s) {
   </div>${s.orgLogo ? `<img class="org-logo" src="${esc(s.orgLogo)}" alt="${org} logo" title="${org}">` : ""}</div>
 
   <section class="mystats" aria-label="Your stats">
-    <div class="card wide">
-      <div class="rate-head">
-        <div><div class="label">Merged PRs</div><div class="mono" style="font-size:44px;font-weight:600;line-height:1.1;margin-top:4px">${s.myMerged}</div></div>
-        <div class="rate">${crest(r.rate, 58)}<div>
-          <div class="label">Silverback rate</div>
-          <div style="margin-top:2px;display:flex;align-items:baseline;gap:8px">${rateText(r, 30)}</div>
-          <div class="sub" style="margin-top:0">${r.total ? `${r.first} of ${r.total} approved on the first review` : "Nothing merged into develop in this period"}</div></div></div>
-      </div>
+    <div class="quad">
+      <div class="card small"><div class="label">Merged PRs</div><div class="mono">${s.myMerged}</div><div class="sub">into develop</div></div>
+      <div class="card small"><div class="label">Lines changed</div>
+        <div class="mono lines"><span class="add">${num(s.lines?.added ?? 0)} ++</span><span class="del">${num(s.lines?.removed ?? 0)} --</span></div></div>
+      <div class="card small"><div class="label">Open PRs</div><div class="mono">${open}</div><div class="sub">+ ${drafts} draft${drafts === 1 ? "" : "s"}</div></div>
+      <div class="card small"><div class="label">Issues assigned</div><div class="mono">${s.myIssues.length}</div><div class="sub">${s.newIssues} new ${s.period === "0" ? "overall" : "this period"}</div></div>
+    </div>
+    <div class="card ratecard">
+      <div class="rate">${crest(r.rate, 128) || `<span style="width:128px"></span>`}<div>
+        <div class="label" style="font-size:14px">Your Silverback rate</div>
+        <div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:baseline;gap:10px">${rateText(r, 48)}</div>
+        <div class="sub" style="margin-top:4px">${r.total ? `${r.first} of ${r.total} approved on the first review` : "Nothing merged into develop in this period"}</div></div></div>
       <div><div class="tierbar" role="img" aria-label="${r.rate == null ? "No Silverback rate yet" : `Silverback rate ${r.rate}%, ${t.name}`}. Tiers start at 30, 60 and 90 percent.">
           <div style="width:${r.rate ?? 0}%;background:${t ? t.c : "transparent"}"></div><i style="left:30%"></i><i style="left:60%"></i><i style="left:90%"></i></div>
         <div class="tiers">${[...TIERS].reverse().map((x) => `<span>${x.min === 90 ? "King" : x.name}</span>`).join("")}</div></div>
     </div>
-    <div class="side">
-      <div class="pair">
-        <div class="card small"><div class="label">Open PRs</div><div class="mono">${open}</div><div class="sub">+ ${drafts} draft${drafts === 1 ? "" : "s"}</div></div>
-        <div class="card small"><div class="label">Issues assigned</div><div class="mono">${s.myIssues.length}</div><div class="sub">${s.newIssues} new ${s.period === "0" ? "overall" : "this period"}</div></div>
-      </div>
-      ${rateChart(s.mySeries, "Your Silverback rate", `Your PRs merged into develop, ${periodLabel(s.period, s.at)}`)}
-    </div>
+    ${rateChart(s.mySeries, "Your Silverback rate over time", `Your PRs merged into develop, ${periodLabel(s.period, s.at)}`)}
   </section>
   <section class="rankcards" aria-label="Silverback rate of the repository and the organization">
     ${rankCard(`Silverback rate · ${repoName}`, s.repoRate)}${rankCard(`Silverback rate · ${org}`, s.orgRate)}

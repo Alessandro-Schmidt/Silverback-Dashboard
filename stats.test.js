@@ -97,3 +97,12 @@ test("rateSeries buckets by day, week or month with the period", () => {
   assert.deepEqual([month[0].unit, month.at(-1).rate, month.at(-2).rate], ["week", 67, 100]);
   assert.equal(rateSeries(prs, periodStart(now, "0"), now)[0].unit, "day"); // overall starts at the first merge (20 Oct)
 });
+
+test("lines added and removed by your merged PRs in the period", () => {
+  const now = Date.now(), ago = (d) => new Date(now - d * 864e5).toISOString();
+  const s = summarize(base({ myDevelop: { nodes: [
+    { createdAt: ago(5), mergedAt: ago(2), additions: 120, deletions: 30, reviews: rev("APPROVED") },
+    { createdAt: ago(9), mergedAt: ago(1), additions: 5, deletions: 70, reviews: rev("APPROVED") },
+    { createdAt: ago(200), mergedAt: ago(190), additions: 999, deletions: 999, reviews: rev("APPROVED") } ] } }), "a/b", "a", "30", now);
+  assert.deepEqual(s.lines, { added: 125, removed: 100 });
+});
