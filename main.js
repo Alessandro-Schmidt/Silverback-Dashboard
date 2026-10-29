@@ -3,6 +3,7 @@ import { startLoading } from "./loader.js";
 import { crest, explainer, rateChart } from "./extension/lib/crest.js";
 import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, validPeriod, setStatus, tenure, tier, TIERS } from "./extension/lib/stats.js";
 import { renderTeam, loadTeam, rankCard } from "./team.js";
+import "./tooltip.js";
 
 // Kept in Preferences (Android SharedPreferences "CapacitorStorage"), which the home-screen widget also reads.
 const get = async (key) => (await Preferences.get({ key })).value;
@@ -54,7 +55,7 @@ function cycleChart(weeks) {
       <g fill="#9AA4B2" font-size="11" font-family="Inter, sans-serif" text-anchor="end">${[0, 1, 2, 3].map((i) => `<text x="20" y="${144 - i * 40}">${i ? `${(top / 3) * i}d` : "0"}</text>`).join("")}</g>
       <g fill="#9AA4B2" font-size="11" font-family="Inter, sans-serif" text-anchor="middle">${pts.map((p) => `<text x="${p.x}" y="162">${day(p.start)}</text>`).join("")}</g>
       <polyline points="${known.map((p) => `${p.x},${y(p.cycle)}`).join(" ")}" fill="none" stroke="#4C8DFF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-      <g fill="#4C8DFF" stroke="#161B22" stroke-width="2">${known.map((p) => `<circle cx="${p.x}" cy="${y(p.cycle)}" r="4.5"><title>Week of ${day(p.start)}: ${p.cycle.toFixed(1)} days</title></circle>`).join("")}</g>
+      <g fill="#4C8DFF" stroke="#161B22" stroke-width="2">${known.map((p) => `<circle cx="${p.x}" cy="${y(p.cycle)}" r="4.5" tabindex="0" data-tip="Week of ${day(p.start)}: ${p.cycle.toFixed(1)} days" aria-label="Week of ${day(p.start)}: ${p.cycle.toFixed(1)} days"/>`).join("")}</g>
     </svg></figure>`;
 }
 
@@ -66,7 +67,7 @@ function agesChart(prs, now) {
       <span class="mono" style="width:44px;color:#B1BAC4">#${a.num}</span>
       <div style="flex:1 1 auto"><div style="width:${Math.max(2, (a.days / max) * 100)}%;height:14px;background:${a.draft ? "var(--dim)" : "var(--accent)"};border-radius:0 4px 4px 0"></div></div>
       <span class="mono" style="width:34px;text-align:right">${a.days}d</span><span class="muted" style="width:40px">${a.draft ? "Draft" : "Open"}</span>
-      <div class="tip" style="left:40%"><div>${esc(a.title)}</div><div class="muted">${a.draft ? "Draft" : "Open"} · ${a.days} days</div></div></div>`).join("") || `<p class="muted">No open PRs.</p>`}</div>
+      <div class="tip"><div>${esc(a.title)}</div><div class="muted">${a.draft ? "Draft" : "Open"} · ${a.days} days</div></div></div>`).join("") || `<p class="muted">No open PRs.</p>`}</div>
     <div class="legend"><span><i class="swatch" style="background:var(--accent)"></i>Open</span><span><i class="swatch" style="background:var(--dim)"></i>Draft</span></div></figure>`;
 }
 

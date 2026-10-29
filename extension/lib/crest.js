@@ -74,7 +74,7 @@ export function rateChart(series, title, sub) {
       <g fill="#9AA4B2" font-size="11" font-family="Inter, sans-serif" text-anchor="end">${[0, 30, 60, 90].map((v) => `<text x="${L - 8}" y="${y(v) + 4}">${v}%</text>`).join("")}</g>
       <g fill="#9AA4B2" font-size="11" font-family="Inter, sans-serif" text-anchor="middle">${series.map((b, i) => (i % every && i !== n - 1) ? "" : `<text x="${x(i)}" y="158">${fmt(b)}</text>`).join("")}</g>
       ${known.length > 1 ? `<polyline points="${known.map((b) => `${x(b.i)},${y(b.rate)}`).join(" ")}" fill="none" stroke="#4C8DFF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : ""}
-      <g stroke="#161B22" stroke-width="2">${known.map((b) => `<circle cx="${x(b.i)}" cy="${y(b.rate)}" r="4.5" fill="${tier(b.rate).c}"><title>${fmt(b)}: ${b.rate}% (${b.first} of ${b.total})</title></circle>`).join("")}</g>
+      <g stroke="#161B22" stroke-width="2">${known.map((b) => `<circle cx="${x(b.i)}" cy="${y(b.rate)}" r="4.5" fill="${tier(b.rate).c}" tabindex="0" data-tip="${fmt(b)}: ${b.rate}% · ${tier(b.rate).name} (${b.first} of ${b.total})" aria-label="${fmt(b)}: ${b.rate}%, ${b.first} of ${b.total}"/>`).join("")}</g>
       ${known.length ? "" : `<text x="${(L + R) / 2}" y="85" text-anchor="middle" fill="#9AA4B2" font-size="12" font-family="Inter, sans-serif">No merged PRs in this period</text>`}
     </svg>${last ? `<div class="sub" style="margin-top:0">Latest: <b style="color:${tier(last.rate).c}">${last.rate}%</b> · ${tier(last.rate).name}</div>` : ""}</figure>`;
 }

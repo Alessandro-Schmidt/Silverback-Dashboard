@@ -115,9 +115,11 @@
   .bar { flex: 1 1 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; position: relative; outline: none; }
   .bar div { width: 26px; max-width: 100%; }
   .xlabels { display: flex; gap: 10px; padding: 0 4px; margin-top: -6px; } .xlabels span { flex: 1 1 0; text-align: center; font-size: 11px; color: var(--muted); }
-  .tip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -6px); background: var(--bg); border: 1px solid var(--edge); border-radius: 6px;
-    padding: 8px 10px; font-size: 12px; line-height: 1.5; white-space: nowrap; z-index: 2; }
-  .bar:hover .tip, .bar:focus .tip, .hrow:hover .tip, .hrow:focus .tip { display: block; }
+  .tip { display: none; } /* content for the floating #tooltip */
+  #tooltip { position: fixed; z-index: 50; pointer-events: none; max-width: 300px; background: var(--bg); border: 1px solid var(--edge); border-radius: 6px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.5; box-shadow: 0 6px 18px #0009; }
+  #tooltip[hidden] { display: none; }
+  .bar, .hrow, [data-tip] { cursor: default; } circle[data-tip]:hover, circle[data-tip]:focus { stroke: var(--fg); outline: none; }
   .hrow { display: flex; align-items: center; gap: 10px; font-size: 12px; position: relative; outline: none; }
   .split { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
   .prs { flex: 999 1 560px; padding: 0; overflow: hidden; }
@@ -203,6 +205,10 @@
   /* Review balance and merged-per-week get the room; all three cards share one height */
   .team-charts { display: grid; grid-template-columns: 1.4fr 1.4fr 1fr; gap: 16px; align-items: stretch; }
   .team-charts > * { min-width: 0; }
+  /* One fixed height for the three team cards; long lists scroll inside their card */
+  .teamcard { margin: 0; padding: 18px 20px; height: 440px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; }
+  .teamcard .scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 6px; }
+  .teamcard .scroll { scrollbar-width: thin; scrollbar-color: var(--edge) transparent; }
   @media (max-width: 1100px) { .team-charts { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 720px) { .team-charts { grid-template-columns: 1fr; } }
   .alert { display: flex; gap: 12px; align-items: flex-start; padding: 12px; background: var(--well); border: 1px solid var(--line); border-radius: 8px; }
