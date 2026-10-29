@@ -10,13 +10,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Alessandro-Schmidt/GHero.git"
+    "url": "git+https://github.com/Silverback-Corp/Silverback-Dashboard.git"
   },
   "type": "module",
   "bugs": {
-    "url": "https://github.com/Alessandro-Schmidt/GHero/issues"
+    "url": "https://github.com/Silverback-Corp/Silverback-Dashboard/issues"
   },
-  "homepage": "https://github.com/Alessandro-Schmidt/GHero#readme",
+  "homepage": "https://github.com/Silverback-Corp/Silverback-Dashboard#readme",
   "dependencies": {
     "@capacitor/android": "8.6.0",
     "@capacitor/core": "8.6.0",

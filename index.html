@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GHero</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<title>Silverback</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
 <style>
   :root { --bg: #0D1117; --card: #161B22; --well: #11161D; --line: #21262D; --edge: #30363D; --fg: #E6EDF3; --muted: #9AA4B2; --dim: #6E7681;
     --accent: #4C8DFF; --redo: #D07A2A; --link: #8AB4FF; --ok: #56D364; color-scheme: dark; }
@@ -41,21 +42,66 @@
   .menu button { display: flex; align-items: center; gap: 8px; padding: 8px; background: none; border: 0; border-radius: 6px; text-align: left; cursor: pointer; }
   .menu button:hover, .menu button[aria-current] { background: var(--line); }
   .menu img { width: 20px; height: 20px; border-radius: 5px; }
-  #org summary { cursor: pointer; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--edge); overflow: hidden; background: #000; }
-  #org summary img { width: 100%; height: 100%; display: block; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--fg); } .brand:hover { color: var(--fg); text-decoration: none; }
+  .brand span { display: flex; flex-direction: column; line-height: 1.1; } .brand b { font-size: 18px; font-weight: 800; letter-spacing: -.03em; } .brand small { font-size: 11px; color: var(--muted); }
+  .divider { width: 1px; height: 28px; background: var(--edge); margin: 0 4px; }
+  .group { padding: 8px 8px 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  #orgs, #repos { display: grid; gap: 2px; }
+  .banner { background: #2B2112; border-bottom: 1px solid #5A4520; color: #E3B341; }
+  .banner .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 8px; padding-bottom: 8px; }
+  .sk { background: var(--card); border: 1px solid var(--line); border-radius: 12px; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .5; } }
+  @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+  body.first-run header .wrap > :not(.brand) { display: none; }
+  .welcome { max-width: 640px; margin: 24px auto 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .welcome h1 { font-size: 44px; font-weight: 800; letter-spacing: -.03em; margin-top: 8px; }
+  .welcome .slogan { margin: 0; font-size: 18px; color: var(--muted); }
+  .welcome .lead { margin: 8px 0 12px; color: #C9D1D9; line-height: 1.6; font-size: 15px; }
+  .welcome-form { width: 100%; box-sizing: border-box; text-align: left; display: flex; flex-direction: column; gap: 10px; }
+  .welcome-form label { font-weight: 600; }
+  .welcome-form .row { display: flex; gap: 8px; }
+  .welcome-form input { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; background: var(--bg); border: 1px solid var(--edge); border-radius: 8px; }
+  .welcome-form button { min-height: 44px; padding: 0 18px; background: var(--accent); color: #0D1117; font-weight: 600; border: 0; border-radius: 8px; cursor: pointer; }
+  .privacy { list-style: none; padding: 0; margin: 8px 0 0; text-align: left; display: grid; gap: 10px; color: #C9D1D9; line-height: 1.5; }
+  .privacy li { padding-left: 26px; position: relative; }
+  .privacy li::before { content: ""; position: absolute; left: 4px; top: 5px; width: 6px; height: 11px; border: solid var(--ok); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  @keyframes sb-beat { 0%,100% { transform: scale(1) } 8% { transform: scale(1.045) } 16% { transform: scale(1) } 24% { transform: scale(1.06) } 34% { transform: scale(1) } }
+  @keyframes sb-ring { 0% { transform: scale(.92); opacity: .55 } 100% { transform: scale(1.9); opacity: 0 } }
+  @keyframes sb-msg { 0% { opacity: 0; transform: translateY(6px) } 15%,85% { opacity: 1; transform: none } 100% { opacity: 0; transform: translateY(-6px) } }
+  @keyframes sb-fade { from { opacity: 0 } to { opacity: 1 } }
+  .sb-overlay { position: fixed; inset: 0; z-index: 10; box-sizing: border-box; background: rgba(13, 17, 23, .62); backdrop-filter: blur(7px) saturate(.8); -webkit-backdrop-filter: blur(7px) saturate(.8);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; padding: 48px 16px; animation: sb-fade .35s ease-out both; }
+  .sb-overlay[hidden] { display: none; }
+  .ld-mark { position: relative; width: 220px; height: 220px; }
+  .sb-disc { position: relative; display: block; animation: sb-beat 1.6s ease-in-out infinite; transform-origin: 50% 50%; }
+  .sb-ring { position: absolute; inset: 0; border-radius: 999px; border: 3px solid var(--accent); animation: sb-ring 1.6s ease-out infinite; }
+  .sb-ring2 { animation-delay: .38s; border-color: var(--redo); }
+  .ld-text { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .ld-name { font-size: 32px; font-weight: 800; letter-spacing: -.03em; }
+  .ld-msgbox { height: 24px; overflow: hidden; }
+  .sb-msg { color: var(--muted); font-size: 16px; animation: sb-msg 1.6s ease-in-out infinite; }
+  .ld-progress { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 10px; }
+  .ld-track { position: relative; height: 8px; border-radius: 999px; background: var(--line); }
+  .ld-main { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--accent); border-radius: 999px; transition: width .2s; }
+  .ld-over { position: absolute; left: 100%; top: 0; bottom: 0; width: 0; margin-left: 2px; background: var(--redo); border-radius: 0 999px 999px 0; transition: width .2s; }
+  .ld-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); } .ld-pct { color: var(--fg); }
+  @media (prefers-reduced-motion: reduce) { .sb-disc, .sb-ring, .sb-msg { animation: none; } .sb-ring { opacity: 0; } }
+  :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
   #repo summary { background: transparent; font-weight: 600; font-size: 15px; }
   #repo .org { color: var(--muted); font-weight: 500; } #repo .sep { color: var(--dim); }
   #token .menu { left: auto; right: 0; padding: 12px; gap: 8px; }
   #token input { min-height: 40px; padding: 0 10px; background: var(--bg); border: 1px solid var(--edge); border-radius: 8px; }
   #token .menu button { justify-content: center; background: var(--accent); color: #0D1117; font-weight: 600; }
   .spacer { flex: 1 1 auto; }
-  #period { appearance: auto; }
+  #period { appearance: none; -webkit-appearance: none; padding-right: 40px; background: var(--card) no-repeat right 12px center / 18px
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239AA4B2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
   #status { color: var(--muted); font-size: 13px; }
   #refresh { width: 40px; justify-content: center; padding: 0; }
 
   main.wrap { padding-top: 32px; padding-bottom: 64px; display: flex; flex-direction: column; gap: 32px; }
   .hello { display: flex; align-items: center; gap: 16px; }
   .hello img { width: 52px; height: 52px; border-radius: 999px; }
+  .hello .org-logo { margin-left: auto; border-radius: 12px; border: 1px solid var(--edge); }
   .hello h1 { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
   .stats .wide { grid-column: span 2; display: flex; flex-direction: column; gap: 16px; }
@@ -77,6 +123,7 @@
   .prrow { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid #1C222B; min-width: 560px; }
   .prrow:hover { background: #1A2029; }
   .prrow > a { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 900px) { .split { flex-direction: column; align-items: stretch; } .prs, aside { flex: none; width: 100%; } }
   aside { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
   aside .card { padding: 18px 20px; }
   .mini { display: grid; gap: 12px; } .mini .mono { font-size: 22px; font-weight: 600; } .mini .muted { font-size: 12px; }
@@ -97,8 +144,13 @@
 </head>
 <body>
 <header><div class="wrap">
-  <details id="org" class="picker"><summary aria-label="Pick organization"></summary><div class="menu"></div></details>
-  <details id="repo" class="picker"><summary class="ctl" aria-label="Pick repository"></summary><div class="menu"></div></details>
+  <a class="brand" href="#" aria-label="Silverback home">
+    <svg width="34" height="34" viewBox="0 0 200 200" aria-hidden="true"><defs><clipPath id="hdr"><circle cx="100" cy="100" r="96"/></clipPath></defs><circle cx="100" cy="100" r="96" fill="#E6EDF3"/><path clip-path="url(#hdr)" fill="#0D1117" d="M 0 200 C 4 168 16 140 34 124 C 46 114 54 104 58 92 C 62 76 66 56 76 42 C 80 36 86 30 92 28 C 100 30 110 38 118 48 C 124 54 130 58 136 60 C 139 62 139 66 135 68 C 133 69 131 70 131 72 C 136 76 142 80 147 84 C 152 88 152 95 147 98 C 150 102 149 108 143 111 C 138 118 130 121 122 121 C 118 122 116 126 118 130 C 134 134 150 144 162 158 C 172 170 178 186 180 200 Z"/></svg>
+    <span><b>Silverback</b><small>Ship like you mean it.</small></span>
+  </a>
+  <span class="divider" aria-hidden="true"></span>
+  <details id="repo" class="picker"><summary class="ctl" aria-label="Pick organization and repository"></summary>
+    <div class="menu"><div class="group">Organizations</div><div id="orgs"></div><div class="group">Repositories</div><div id="repos"></div></div></details>
   <div class="spacer"></div>
   <select id="period" class="ctl" aria-label="Period"></select>
   <span id="status"></span>
@@ -111,7 +163,45 @@
     </form>
   </details>
 </div></header>
-<main id="app" class="wrap"><p class="empty">Connect a GitHub token to see your stats.</p></main>
+<div id="banner" class="banner" role="alert" hidden><div class="wrap"><span id="banner-text"></span><button id="retry" type="button" class="ctl">Retry</button></div></div>
+<main id="app" class="wrap">
+  <section class="welcome" aria-labelledby="welcome-title">
+    <svg width="112" height="112" viewBox="0 0 200 200" role="img" aria-label="Silverback logo"><defs><clipPath id="wl"><circle cx="100" cy="100" r="96"/></clipPath></defs><circle cx="100" cy="100" r="96" fill="#E6EDF3"/><path clip-path="url(#wl)" fill="#0D1117" d="M 0 200 C 4 168 16 140 34 124 C 46 114 54 104 58 92 C 62 76 66 56 76 42 C 80 36 86 30 92 28 C 100 30 110 38 118 48 C 124 54 130 58 136 60 C 139 62 139 66 135 68 C 133 69 131 70 131 72 C 136 76 142 80 147 84 C 152 88 152 95 147 98 C 150 102 149 108 143 111 C 138 118 130 121 122 121 C 118 122 116 126 118 130 C 134 134 150 144 162 158 C 172 170 178 186 180 200 Z"/><path d="M119 66 L130 67.5" stroke="#E6EDF3" stroke-width="2.6" stroke-linecap="round"/></svg>
+    <h1 id="welcome-title">Silverback</h1>
+    <p class="slogan">Ship like you mean it.</p>
+    <p class="lead">Your personal productivity dashboard on top of GitHub: the PRs you opened and merged, how many were approved on the first review,
+      how long they waited, and your assigned issues on a board you can drag to update.</p>
+    <form id="welcome-form" class="card welcome-form">
+      <label for="welcome-token">Paste a GitHub personal access token to start</label>
+      <div class="row"><input id="welcome-token" name="token" type="password" autocomplete="off" required placeholder="github_pat_… or ghp_…"><button>Connect</button></div>
+      <p class="sub">Read access to <b>Metadata</b>, <b>Pull requests</b>, <b>Issues</b> and <b>Projects</b> is enough. Add <b>Projects write</b> to move issues on the board.</p>
+    </form>
+    <ul class="privacy">
+      <li><b>We don't collect any data.</b> There is no account, no tracking and no analytics.</li>
+      <li><b>There is no database and no server.</b> Your browser or phone talks to GitHub directly.</li>
+      <li><b>Nothing is processed on our side.</b> Your token and stats stay on your device, and you can replace or remove them at any time.</li>
+    </ul>
+  </section>
+</main>
+<div id="loader" class="sb-overlay" hidden>
+  <div class="ld-mark">
+    <span class="sb-ring" aria-hidden="true"></span><span class="sb-ring sb-ring2" aria-hidden="true"></span>
+    <svg class="sb-disc" width="220" height="220" viewBox="0 0 200 200" role="img" aria-label="Silverback gorilla beating its chest">
+      <defs><clipPath id="ld"><circle cx="100" cy="100" r="96"/></clipPath></defs>
+      <circle cx="100" cy="100" r="96" fill="#E6EDF3"/>
+      <g clip-path="url(#ld)" fill="none" stroke="#E6EDF3" stroke-linecap="round">
+        <path class="g-body" fill="#0D1117" stroke="none"/>
+        <path class="g-eye2" stroke-width="2.6"/><path class="g-eye1" stroke-width="2.6"/>
+        <path class="g-b2" stroke-width="2.4"/><path class="g-b1" stroke-width="2.4"/>
+      </g>
+    </svg>
+  </div>
+  <div class="ld-text"><div class="ld-name">Silverback</div><div class="ld-msgbox" aria-live="polite"><div class="sb-msg"></div></div></div>
+  <div class="ld-progress">
+    <div role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" class="ld-track"><div class="ld-main"></div><div class="ld-over"></div></div>
+    <div class="ld-meta"><span class="ld-status"></span><span class="ld-pct mono"></span></div>
+  </div>
+</div>
 <script type="module" src="/main.js"></script>
 </body>
 </html>

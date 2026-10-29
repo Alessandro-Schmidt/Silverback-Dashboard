@@ -3,11 +3,11 @@
 export const QUERY = `query($owner:String!,$name:String!,$org:String!,$qOpen:String!,$qMerged:String!,$qIssues:String!,$qDevelop:String!,$qFirst:String!){
   viewer{ login avatarUrl }
   repository(owner:$owner,name:$name){ pullRequests(states:OPEN){totalCount} issues(states:OPEN){totalCount} stargazerCount }
-  organization(login:$org){ avatarUrl repositories(first:100){ totalCount nodes{ pullRequests(states:OPEN){totalCount} primaryLanguage{name} } } }
+  organization(login:$org){ avatarUrl repositories(first:100){ totalCount nodes{ pullRequests(states:OPEN){totalCount} languages(first:10){ edges{ size node{ name } } } } } }
   myOpen: search(query:$qOpen,type:ISSUE,first:100){ issueCount nodes{ ... on PullRequest { number title url isDraft createdAt headRefName comments{totalCount} } } }
   myFirst: search(query:$qFirst,type:ISSUE,first:1){ nodes{ ... on PullRequest { createdAt } ... on Issue { createdAt } } }
   myMerged: search(query:$qMerged,type:ISSUE,first:1){ issueCount }
-  myIssues: search(query:$qIssues,type:ISSUE,first:100){ issueCount nodes{ ... on Issue { number title url createdAt closedByPullRequestsReferences(first:1,includeClosedPrs:true){ nodes{ number } }
+  myIssues: search(query:$qIssues,type:ISSUE,first:100){ issueCount nodes{ ... on Issue { number title url createdAt closedByPullRequestsReferences(first:1){ nodes{ number } }
     projectItems(first:5){ nodes{ id project{ id } fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue{ name optionId field{ ... on ProjectV2SingleSelectField{ id options{ id name } } } } } } } } } }
   myDevelop: search(query:$qDevelop,type:ISSUE,first:100){ nodes{ ... on PullRequest { headRefOid createdAt mergedAt reviews(first:2){ totalCount nodes{ state commit{oid} } } } } }
 }`;
@@ -20,6 +20,12 @@ export function workdaysSince(now, days) {
   const d = new Date(now);
   d.setHours(0, 0, 0, 0);
   for (let n = 0; ; d.setDate(d.getDate() - 1)) if (d.getDay() % 6 && ++n === days) return d;
+}
+
+// Start of a period: "30"/"10" = that many working days, "q" = this quarter, "0" = overall (null).
+export function periodStart(now, period) {
+  if (period === "q") { const d = new Date(now); return new Date(d.getFullYear(), d.getMonth() - (d.getMonth() % 3), 1); }
+  return Number(period) ? workdaysSince(now, Number(period)) : null;
 }
 
 // "2y 3m" style length of time between two dates.
@@ -47,11 +53,13 @@ export function weeks(prs, now, n = 6) {
 }
 
 // ponytail: org PRs, languages and every personal list cover the first 100 results; paginate if that's ever exceeded.
-// `days`: 0 = overall, else the personal tiles count only the last `days` working days.
-export function summarize(data, repo, org, days = 0, now = Date.now()) {
+// `period`: see periodStart; the personal numbers count only that period.
+export function summarize(data, repo, org, period = "0", now = Date.now()) {
+  const since = periodStart(now, period), recent = (t) => !since || new Date(t) >= since;
+  const merged = data.myDevelop.nodes.filter((p) => recent(p.mergedAt));
   const r = data.repository, o = data.organization.repositories;
   const langs = {};
-  for (const n of o.nodes) if (n.primaryLanguage) langs[n.primaryLanguage.name] = (langs[n.primaryLanguage.name] || 0) + 1;
+  for (const n of o.nodes) for (const e of n.languages.edges) langs[e.node.name] = (langs[e.node.name] || 0) + e.size; // bytes
   return {
     repo, org, at: Date.now(),
     prs: r.pullRequests.totalCount, issues: r.issues.totalCount, stars: r.stargazerCount,
@@ -60,7 +68,6 @@ export function summarize(data, repo, org, days = 0, now = Date.now()) {
     // Oldest first; `type` is the branch prefix (feat/…, fix/…).
     myOpen: data.myOpen.nodes.map((p) => ({ num: p.number, title: p.title, url: p.url, draft: p.isDraft, comments: p.comments.totalCount,
       type: p.headRefName.includes("/") ? p.headRefName.split("/")[0] : "", createdAt: p.createdAt })).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    myMerged: data.myMerged.issueCount,
     myIssues: data.myIssues.nodes.map((i) => {
       const item = i.projectItems.nodes.find((n) => n.fieldValueByName?.name), v = item?.fieldValueByName;
       // Board column order; issues without a status go last.
@@ -68,23 +75,13 @@ export function summarize(data, repo, org, days = 0, now = Date.now()) {
         // What setStatus needs; ponytail: issues with no status yet can't be moved, would need the project's Status field looked up.
         move: v ? { project: item.project.id, item: item.id, field: v.field.id, optionId: v.optionId, options: v.field.options } : null, rank: v ? v.field.options.findIndex((o) => o.id === v.optionId) : Infinity };
     }).sort((a, b) => a.rank - b.rank),
-    myOneShot: data.myDevelop.nodes.filter(oneShot).length,
-    myDevelopCount: data.myDevelop.nodes.length,
+    period, since: since?.getTime() ?? null,
+    myMerged: data.myMerged.issueCount,
+    myOneShot: merged.filter(oneShot).length, myDevelopCount: merged.length,
+    newIssues: data.myIssues.nodes.filter((i) => recent(i.createdAt)).length,
     weeks: weeks(data.myDevelop.nodes, now),
     // ponytail: GitHub only exposes org join dates to admins, so tenure starts at the first PR or issue you opened in the org.
     firstInOrg: data.myFirst.nodes[0]?.createdAt || null,
-    window: days ? (() => {
-      const since = workdaysSince(now, days), recent = (t) => new Date(t) >= since;
-      return {
-        days, since: since.getTime(),
-        open: data.myOpen.nodes.filter((p) => recent(p.createdAt) && !p.isDraft).length,
-        drafts: data.myOpen.nodes.filter((p) => recent(p.createdAt) && p.isDraft).length,
-        merged: data.myMerged.issueCount,
-        issues: data.myIssues.nodes.filter((i) => recent(i.createdAt)).length,
-        oneShot: data.myDevelop.nodes.filter((p) => recent(p.mergedAt) && oneShot(p)).length,
-        develop: data.myDevelop.nodes.filter((p) => recent(p.mergedAt)).length,
-      };
-    })() : null,
     langs: Object.entries(langs).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([l]) => l).join(", "),
   };
 }
@@ -112,11 +109,14 @@ export const listRepos = async (token, org) =>
   (await gql(token, "query($org:String!){organization(login:$org){repositories(first:100,orderBy:{field:PUSHED_AT,direction:DESC}){nodes{nameWithOwner}}}}", { org }))
     .organization.repositories.nodes.map((r) => r.nameWithOwner);
 
-export async function fetchStats(token, repo, org, days = 0) {
+// One query per refresh. Merged PRs are those into develop; the merged list reaches back to the period start or 6 weeks for the trends, whichever is earlier.
+export async function fetchStats(token, repo, org, period = "0") {
   const [owner, name] = repo.split("/");
-  const now = Date.now(), merged = days ? ` merged:>=${workdaysSince(now, days).toISOString()}` : "";
+  const now = Date.now(), since = periodStart(now, period), sixWeeks = new Date(now - 42 * 864e5);
+  const from = since && (since < sixWeeks ? since : sixWeeks);
+  const develop = `repo:${repo} is:pr is:merged author:@me base:develop`;
   return summarize(await gql(token, QUERY, { owner, name, org,
-      qOpen: `repo:${repo} is:pr is:open author:@me`, qMerged: `repo:${repo} is:pr is:merged author:@me${merged}`,
-      qIssues: `repo:${repo} is:issue is:open assignee:@me`, qDevelop: `repo:${repo} is:pr is:merged author:@me base:develop sort:updated-desc`,
-      qFirst: `org:${org} author:@me sort:created-asc` }), repo, org, days, now);
+      qOpen: `repo:${repo} is:pr is:open author:@me`, qMerged: develop + (since ? ` merged:>=${since.toISOString()}` : ""),
+      qIssues: `repo:${repo} is:issue is:open assignee:@me`, qDevelop: `${develop}${from ? ` merged:>=${from.toISOString()}` : ""} sort:updated-desc`,
+      qFirst: `org:${org} author:@me sort:created-asc` }), repo, org, period, now);
 }

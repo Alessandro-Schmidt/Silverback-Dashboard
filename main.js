@@ -1,4 +1,5 @@
 import { Preferences } from "@capacitor/preferences";
+import { startLoading } from "./loader.js";
 import { fetchStats, listOrgs, listRepos, setStatus, tenure } from "./stats.js";
 
 // Kept in Preferences (Android SharedPreferences "CapacitorStorage"), which the home-screen widget also reads.
@@ -6,7 +7,7 @@ const get = async (key) => (await Preferences.get({ key })).value;
 const set = (key, value) => Preferences.set({ key, value });
 const $ = (id) => document.getElementById(id);
 const form = $("cfg"), status = $("status"), app = $("app");
-const orgPicker = $("org"), repoPicker = $("repo"), tokenPicker = $("token"), period = $("period");
+const repoPicker = $("repo"), tokenPicker = $("token"), period = $("period");
 const esc = (v) => String(v).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const day = (t) => new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 const chevron = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`;
@@ -15,8 +16,9 @@ const chevron = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const hidden = (name) => /^(new|done|to test (in|on) uat)$/.test(name.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim());
 const COLUMN_COLORS = ["#8B949E", "#58A6FF", "#E3B341", "#BC8CFF", "#39C5BB", "#F778BA", "#56D364"];
 
-period.innerHTML = [0, 1, 2, 3, 5, 10, 15, 20, 30].map((d) =>
-  `<option value="${d}">${d ? `Last ${d} working day${d > 1 ? "s" : ""}` : "Overall"}</option>`).join("");
+const ddmmyyyy = (t) => new Date(t).toLocaleDateString("en-GB");
+period.innerHTML = [["30", "Last 30 working days"], ["10", "Last 10 working days"], ["q", "This quarter"], ["0", "Overall"]]
+  .map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
 
 function mergedChart(weeks) {
   const max = Math.max(1, ...weeks.map((w) => w.merged)), h = (n) => `${(n / max) * 140}px`;
@@ -24,7 +26,7 @@ function mergedChart(weeks) {
     <div class="legend"><span><i class="swatch" style="background:var(--accent)"></i>First try</span><span><i class="swatch" style="background:var(--redo)"></i>Needed changes</span></div>
     <div class="bars">${weeks.map((w) => `<div class="bar" tabindex="0" aria-label="Week of ${day(w.start)}: ${w.merged} merged, ${w.first} approved first try">
       <span class="mono" style="font-size:12px;margin-bottom:4px">${w.merged}</span>
-      <div style="height:${h(w.merged - w.first)};background:var(--redo);border-radius:4px 4px 0 0"></div><div style="height:${h(w.first)};background:var(--accent)"></div>
+      ${w.merged - w.first ? `<div style="height:${h(w.merged - w.first)};background:var(--redo);border-radius:4px 4px 0 0"></div>` : ""}${w.first ? `<div style="height:${h(w.first)};background:var(--accent)${w.merged === w.first ? ";border-radius:4px 4px 0 0" : ""}"></div>` : ""}
       <div class="tip"><div class="muted">Week of ${day(w.start)}</div><div>${w.merged} merged</div><div>${w.first} first try · ${w.merged - w.first} needed changes</div></div></div>`).join("")}</div>
     <div class="xlabels">${weeks.map((w) => `<span>${day(w.start)}</span>`).join("")}</div></figure>`;
 }
@@ -61,13 +63,12 @@ function agesChart(prs, now) {
 }
 
 function render(s) {
-  orgPicker.querySelector("summary").innerHTML = s.orgLogo ? `<img src="${esc(s.orgLogo)}" alt="${esc(s.org)}">` : "";
   showRepo(s.repo);
-  if (!s.weeks) return; // cache from an older version
+  if (!("period" in s)) return; // cache from an older version
   shown = s;
-  const w = s.window, repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
+  const repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
   const drafts = s.myOpen.filter((p) => p.draft).length, open = s.myOpen.length - drafts;
-  const first = w ? w.oneShot : s.myOneShot, base = w ? w.develop : s.myDevelopCount, pct = base ? Math.round((first / base) * 100) : 0;
+  const first = s.myOneShot, base = s.myDevelopCount, pct = base ? Math.round((first / base) * 100) : 0;
   // Every board column, empty ones too, so issues can be dropped anywhere.
   // ponytail: columns come from the first issue's board; issues on other boards only show if their status name matches.
   const options = s.myIssues.find((i) => i.move)?.move.options || [];
@@ -78,20 +79,20 @@ function render(s) {
   app.innerHTML = `
   <div class="hello">${s.meAvatar ? `<img src="${esc(s.meAvatar)}" alt="">` : ""}<div>
     <h1>${esc(s.me || "Me")}</h1>
-    <p class="muted" style="margin:4px 0 0">Your activity on ${repoName}${w ? ` since ${new Date(w.since).toLocaleDateString()}` : ""}${s.firstInOrg ? ` · at ${org} for ${tenure(s.firstInOrg, s.at)} (since ${new Date(s.firstInOrg).toLocaleDateString()})` : ""}</p>
-  </div></div>
+    <p class="muted" style="margin:4px 0 0">Your activity on ${repoName}${s.since || s.firstInOrg ? ` since ${ddmmyyyy(s.since || s.firstInOrg)}` : ""}${s.firstInOrg ? ` · ${tenure(s.firstInOrg, s.at)} at ${org}` : ""}</p>
+  </div>${s.orgLogo ? `<img class="org-logo" src="${esc(s.orgLogo)}" alt="${org} logo" title="${org}">` : ""}</div>
 
   <section class="stats" aria-label="Your stats">
     <div class="card wide">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
         <div><div class="label">Merged PRs</div><div class="mono" style="font-size:44px;font-weight:600;line-height:1.1;margin-top:4px">${s.myMerged}</div></div>
         <div style="text-align:right"><div class="label">Approved first try</div>
-          <div style="margin-top:4px"><span class="mono" style="font-size:28px;font-weight:600">${first}</span><span class="muted"> / ${base} into develop · ${pct}%</span></div></div>
+          <div style="margin-top:4px"><span class="mono" style="font-size:28px;font-weight:600">${first}</span><span class="muted"> / ${base} · ${pct}%</span></div></div>
       </div>
       <div class="meter" role="img" aria-label="${pct}% of PRs merged into develop approved on first review"><div style="width:${pct}%"></div></div>
     </div>
-    <div class="card"><div class="label">Open PRs</div><div class="mono big">${w ? w.open : open}</div><div class="sub">+ ${w ? w.drafts : drafts} draft${(w ? w.drafts : drafts) === 1 ? "" : "s"}${w ? " opened this period" : ""}</div></div>
-    <div class="card"><div class="label">Issues assigned</div><div class="mono big">${s.myIssues.length}</div><div class="sub">${w ? `${w.issues} new this period` : "open"}</div></div>
+    <div class="card"><div class="label">Open PRs</div><div class="mono big">${open}</div><div class="sub">+ ${drafts} draft${drafts === 1 ? "" : "s"}</div></div>
+    <div class="card"><div class="label">Issues assigned</div><div class="mono big">${s.myIssues.length}</div><div class="sub">${s.newIssues} new ${s.since ? "this period" : "overall"}</div></div>
   </section>
 
   <section aria-label="Trends" style="display:flex;flex-direction:column;gap:14px">
@@ -186,26 +187,45 @@ app.addEventListener("drop", async (e) => {
   status.textContent = "Moving issue…";
   try {
     await setStatus(await get("token"), issue.move, col.dataset.option);
-    await refresh();
+    await refresh(true);
   } catch (err) {
     from.append(card);
     status.textContent = `Couldn't move the issue (${err.message})`;
   }
 });
 
-async function refresh() {
-  const [token, repo, org, days] = await Promise.all(["token", "repo", "org", "days"].map(get));
+// Loading keeps the last data on screen (or skeletons when there is none); a failure shows a banner with Retry.
+const skeleton = () => `<div class="sk" style="height:60px;width:320px"></div><div class="stats">${'<div class="sk" style="height:130px"></div>'.repeat(3)}</div>
+  <div class="charts">${'<div class="sk" style="height:300px"></div>'.repeat(3)}</div><div class="sk" style="height:320px"></div>`;
+// `quiet` skips the loading overlay (used after moving an issue). One refresh at a time.
+let busy = false;
+async function refresh(quiet) {
+  if (busy) return;
+  busy = true;
+  try { await load(quiet); } finally { busy = false; }
+}
+async function load(quiet) {
+  const [token, repo, org, p] = await Promise.all(["token", "repo", "org", "period"].map(get));
   if (!token || !repo) return;
+  $("banner").hidden = true;
+  if (!shown) app.innerHTML = skeleton();
   status.textContent = "Refreshing…";
+  const finish = quiet === true ? async () => {} : startLoading(repo.split("/")[1]);
   try {
-    const s = await fetchStats(token, repo, org, Number(days) || 0);
+    const s = await fetchStats(token, repo, org, p || "30");
     await set("stats", JSON.stringify(s));
     render(s);
     status.textContent = `Updated ${new Date(s.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    await finish(true);
   } catch (e) {
-    status.textContent = `Offline or failed (${e.message})`;
+    await finish(false);
+    $("banner-text").textContent = `Couldn't reach GitHub (${e.message}).${shown ? " Showing the last data." : ""}`;
+    $("banner").hidden = false;
+    status.textContent = shown ? `Updated ${new Date(shown.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "";
+    if (!shown) app.innerHTML = "";
   }
 }
+$("retry").addEventListener("click", () => refresh());
 
 const showRepo = (r = "") => {
   const [o, n] = r.split("/");
@@ -215,7 +235,7 @@ const showRepo = (r = "") => {
 const fillRepos = async (org, saved) => {
   const repos = await listRepos(await get("token"), org);
   const pick = repos.includes(saved) ? saved : repos[0] || "";
-  repoPicker.querySelector(".menu").innerHTML = repos.map((r) =>
+  $("repos").innerHTML = repos.map((r) =>
     `<button type="button" data-repo="${esc(r)}"${r === pick ? " aria-current" : ""}>${esc(r.split("/")[1])}</button>`).join("");
   showRepo(pick);
   return pick;
@@ -225,9 +245,9 @@ async function loadPickers() {
   if (!(await get("token"))) return;
   try {
     const orgs = await listOrgs(await get("token"));
-    orgPicker.querySelector(".menu").innerHTML = orgs.map((o) =>
-      `<button type="button" data-org="${esc(o.login)}" data-logo="${esc(o.avatarUrl)}"><img src="${esc(o.avatarUrl)}" alt="">${esc(o.login)}</button>`).join("");
     const org = (await get("org")) || orgs[0]?.login;
+    $("orgs").innerHTML = orgs.map((o) =>
+      `<button type="button" data-org="${esc(o.login)}"${o.login === org ? " aria-current" : ""}><img src="${esc(o.avatarUrl)}" alt="">${esc(o.login)}</button>`).join("");
     if (org) await set("org", org), await set("repo", await fillRepos(org, await get("repo")));
   } catch (e) {
     status.textContent = `Couldn't load organizations (${e.message}).`;
@@ -235,16 +255,15 @@ async function loadPickers() {
 }
 
 // Picking an organization, repo or period saves it and refreshes straight away.
-orgPicker.addEventListener("click", async (e) => {
-  const b = e.target.closest("button[data-org]");
-  if (!b) return;
-  orgPicker.open = false;
-  orgPicker.querySelector("summary").innerHTML = `<img src="${esc(b.dataset.logo)}" alt="${esc(b.dataset.org)}">`;
-  await set("org", b.dataset.org);
-  await set("repo", await fillRepos(b.dataset.org));
-  refresh();
-});
 repoPicker.addEventListener("click", async (e) => {
+  const o = e.target.closest("button[data-org]");
+  if (o) { // switch org: list its repos, stay open to pick one
+    for (const x of $("orgs").querySelectorAll("[aria-current]")) x.removeAttribute("aria-current");
+    o.setAttribute("aria-current", "");
+    await set("org", o.dataset.org);
+    await set("repo", await fillRepos(o.dataset.org));
+    return refresh();
+  }
   const b = e.target.closest("button[data-repo]");
   if (!b) return;
   repoPicker.open = false;
@@ -254,27 +273,30 @@ repoPicker.addEventListener("click", async (e) => {
   await set("repo", b.dataset.repo);
   refresh();
 });
-period.addEventListener("change", async () => { await set("days", period.value); refresh(); });
+period.addEventListener("change", async () => { await set("period", period.value); refresh(); });
 $("refresh").addEventListener("click", () => refresh());
 // Close an open menu when tapping elsewhere.
-document.addEventListener("click", (e) => { for (const d of [orgPicker, repoPicker, tokenPicker]) if (!d.contains(e.target)) d.open = false; });
+document.addEventListener("click", (e) => { for (const d of [repoPicker, tokenPicker]) if (!d.contains(e.target)) d.open = false; });
 
 const showToken = (ok) => {
   $("tokenlabel").textContent = ok ? "GitHub token connected" : "Connect GitHub token";
   tokenPicker.querySelector(".dot").style.background = ok ? "var(--ok)" : "var(--redo)";
   form.token.placeholder = ok ? "Token saved (enter to replace)" : "";
 };
-form.addEventListener("submit", async (e) => {
+// The header popover and the first-run welcome screen both save the token the same way.
+for (const f of [form, $("welcome-form")]) f.addEventListener("submit", async (e) => {
   e.preventDefault();
-  await set("token", form.token.value.trim());
-  form.token.value = "", tokenPicker.open = false, showToken(true);
+  await set("token", f.token.value.trim());
+  f.token.value = "", tokenPicker.open = false, showToken(true);
+  document.body.classList.remove("first-run");
   await loadPickers();
   refresh();
 });
 
 const cached = await get("stats");
 if (cached) render(JSON.parse(cached));
-period.value = (await get("days")) || "0";
+period.value = (await get("period")) || "30";
 showToken(!!(await get("token")));
+if (!(await get("token"))) document.body.classList.add("first-run");
 await loadPickers();
 refresh();

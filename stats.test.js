@@ -1,15 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { summarize, oneShot, workdaysSince, tenure, weeks } from "./stats.js";
+import { summarize, oneShot, workdaysSince, tenure, weeks, periodStart } from "./stats.js";
 
 test("summarize", () => {
-  const n = (prs, lang) => ({ pullRequests: { totalCount: prs }, primaryLanguage: lang && { name: lang } });
+  const n = (prs, lang, size = 1) => ({ pullRequests: { totalCount: prs }, languages: { edges: lang ? [{ size, node: { name: lang } }] : [] } });
   const s = summarize({
     viewer: { login: "me" }, repository: { pullRequests: { totalCount: 3 }, issues: { totalCount: 5 }, stargazerCount: 7 },
-    organization: { repositories: { totalCount: 4, nodes: [n(1, "Go"), n(2, "TS"), n(0, "TS"), n(4, null)] } },
+    organization: { repositories: { totalCount: 4, nodes: [n(1, "Go", 50), n(2, "TS", 10), n(0, "TS", 10), n(4, null)] } },
     myOpen: { nodes: [] }, myMerged: { issueCount: 0 }, myFirst: { nodes: [] }, myIssues: { nodes: [] }, myDevelop: { nodes: [] },
   }, "a/b", "a");
-  assert.deepEqual([s.prs, s.issues, s.stars, s.orgRepos, s.orgPrs, s.langs], [3, 5, 7, 4, 7, "TS, Go"]);
+  assert.deepEqual([s.prs, s.issues, s.stars, s.orgRepos, s.orgPrs, s.langs], [3, 5, 7, 4, 7, "Go, TS"]);
 });
 
 test("oneShot", () => {
@@ -43,4 +43,9 @@ test("weeks buckets merges by Monday-start week", () => {
   const pr = (created, merged) => ({ createdAt: created, mergedAt: merged, headRefOid: "h", reviews: { totalCount: 1, nodes: [{ state: "APPROVED", commit: { oid: "h" } }] } });
   const w = weeks([pr("2026-10-20T10:00", "2026-10-22T10:00"), pr("2026-10-18T10:00", "2026-10-26T10:00"), pr("2026-10-24T10:00", "2026-10-28T10:00")], new Date(2026, 9, 29), 2);
   assert.deepEqual(w.map((x) => [x.merged, x.first, Math.round(x.cycle)]), [[1, 1, 2], [2, 2, 6]]);
+});
+
+test("periodStart", () => {
+  const now = new Date(2026, 9, 29, 15);
+  assert.deepEqual([periodStart(now, "q").toDateString(), periodStart(now, "10").getDate(), periodStart(now, "0")], [new Date(2026, 9, 1).toDateString(), 16, null]);
 });

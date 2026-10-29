@@ -1,4 +1,4 @@
-# GHero
+# Silverback
 
 GitHub stats as tiles and home-screen widgets: open PRs, open issues and stars of one repository, plus
 an organization's repository count, total open PRs and top languages.
