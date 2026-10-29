@@ -6,8 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "test": "node --test",
-    "android": "vite build && cap sync android && cap open android",
-    "build:extension": "node extension/build.js"
+    "android": "vite build && cap sync android && cap open android"
   },
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 import { Preferences } from "@capacitor/preferences";
 import { startLoading } from "./loader.js";
-import { crest } from "./crest.js";
-import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, validPeriod, setStatus, tenure, tier, TIERS } from "./stats.js";
+import { crest } from "./extension/lib/crest.js";
+import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, validPeriod, setStatus, tenure, tier, TIERS } from "./extension/lib/stats.js";
 import { renderTeam, loadTeam } from "./team.js";
 
 // Kept in Preferences (Android SharedPreferences "CapacitorStorage"), which the home-screen widget also reads.

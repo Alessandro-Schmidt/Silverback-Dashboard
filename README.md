@@ -51,17 +51,16 @@ system light or dark theme (`res/values*/silverback_colors.xml`).
 
 ## Browser extension (Edge, Chrome)
 
-A toolbar badge with your open PR count, and a popup with your stats and open PRs. It refreshes every 30 minutes
-in the background and shares `stats.js` with the dashboard, so the numbers always match.
+A toolbar badge and a popup with your Silverback rate and crest, your stats, and a "Side-eye" list of what's
+waiting on you; the toolbar icon wears your tier's crest and counts the PRs waiting on you. It refreshes every
+15 minutes in the background.
 
-```bash
-npm run build:extension
-```
+There is nothing to build. Open `edge://extensions` (or `chrome://extensions`), turn on **Developer mode**, click
+**Load unpacked** and pick the `extension/` folder. Click the Silverback icon, paste your token, and pick the
+organization and repository.
 
-Then open `edge://extensions` (or `chrome://extensions`), turn on **Developer mode**, click **Load unpacked**
-and pick the `dist-extension/` folder. Click the Silverback icon, paste your token, and pick the organization,
-repository. The popup shows your Silverback rate and crest, your stats, and a "Side-eye" list of what's waiting
-on you; the toolbar icon wears your tier's crest and counts the PRs waiting on you. The code is in `extension/`.
+The stats logic (`extension/lib/stats.js`) and the crest (`extension/lib/crest.js`) live inside the extension so
+it loads as-is; the web app imports them from there, so both always compute the same numbers.
 
 ## GitHub Pages
 

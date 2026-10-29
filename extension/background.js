@@ -1,7 +1,7 @@
 // Refreshes the stats every 15 minutes. The toolbar icon wears a mini crest in your tier colour, and the badge
 // counts the PRs waiting on you (hidden at 0). Everything stays in chrome.storage.local, never synced:
 // no server, nothing leaves the browser except the calls to GitHub.
-import { fetchStats, sideEye, tier, validPeriod } from "./stats.js";
+import { fetchStats, sideEye, tier, validPeriod } from "./lib/stats.js";
 
 const SHIELD = new Path2D("M60 4 L110 18 V60 C110 96 88 122 60 134 C32 122 10 96 10 60 V18 Z");
 

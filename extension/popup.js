@@ -1,5 +1,5 @@
-import { crest, mark } from "./crest.js";
-import { listOrgs, listRepos, PERIOD_ORDER, periodOption, sideEye, tier, toNextTier, validPeriod } from "./stats.js";
+import { crest, mark } from "./lib/crest.js";
+import { listOrgs, listRepos, PERIOD_ORDER, periodOption, sideEye, tier, toNextTier, validPeriod } from "./lib/stats.js";
 
 const $ = (id) => document.getElementById(id);
 const form = $("form"), store = chrome.storage.local;
@@ -74,15 +74,25 @@ async function fillOrgs(token, org, repo) {
     $("setup-error").hidden = false;
   }
 }
-form.token.addEventListener("change", () => form.token.value.trim() && fillOrgs(form.token.value.trim()));
+// Load the organizations as soon as a token is pasted or typed (not only when the field loses focus).
+let typing;
+form.token.addEventListener("input", () => {
+  clearTimeout(typing);
+  typing = setTimeout(() => form.token.value.trim().length >= 20 && fillOrgs(form.token.value.trim()), 400);
+});
 form.org.addEventListener("change", async () => {
   const { token } = await store.get("token");
   options(form.repo, await listRepos(form.token.value.trim() || token, form.org.value));
 });
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  if (!form.repo.value) return;
   const token = form.token.value.trim();
+  if (!form.repo.value) { // Save before the lists loaded: load them now and ask to pick
+    if (token) await fillOrgs(token);
+    $("setup-error").textContent = form.repo.value ? "Check the organization and repository, then Save." : "Paste a valid GitHub token first.";
+    $("setup-error").hidden = false;
+    return;
+  }
   await store.set({ ...(token && { token }), org: form.org.value, repo: form.repo.value, stats: null });
   form.token.value = "";
   show(false);

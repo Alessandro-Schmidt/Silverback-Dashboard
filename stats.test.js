@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, weeks, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam } from "./stats.js";
+import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, weeks, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam } from "./extension/lib/stats.js";
 
 const rev = (...states) => ({ nodes: states.map((state, i) => ({ state, submittedAt: `2026-10-0${i + 1}T10:00:00Z`, author: { login: "rev" } })) });
 const base = (extra = {}) => ({

@@ -1,12 +1,12 @@
 // Team view (design board "Team"), open to everyone: the repo's and org's Silverback rate,
 // team totals, merged per week, review balance, things that need attention, and a sortable members table.
-import { crest } from "./crest.js";
-import { fetchTeam, periodLabel, tier } from "./stats.js";
+import { crest } from "./extension/lib/crest.js";
+import { fetchTeam, periodLabel, tier } from "./extension/lib/stats.js";
 
 const esc = (v) => String(v).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const day = (t) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 const cache = new Map(); // `${repo}|${period}` → team stats, for the session
-let team = null, sort = { key: "merged", dir: -1 }, q = "", host, stats;
+let team = null, sort = { key: "rate", dir: -1 }, q = "", host, stats;
 
 export async function loadTeam(token, s) {
   const key = `${s.repo}|${s.period}`;
@@ -17,7 +17,7 @@ export async function loadTeam(token, s) {
 export function renderTeam(el, s) {
   host = el, stats = s;
   team = cache.get(`${s.repo}|${s.period}`) || null;
-  if (!team) { el.innerHTML = `<div class="sk" style="height:60px;width:320px"></div><div class="team-stats">${'<div class="sk" style="height:110px"></div>'.repeat(4)}</div><div class="sk" style="height:420px"></div>`; return; }
+  if (!team) { el.innerHTML = `<div class="sk" style="height:60px;width:320px"></div><div class="sk" style="height:130px"></div><div class="sk" style="height:130px"></div><div class="team-stats">${'<div class="sk" style="height:120px"></div>'.repeat(5)}</div><div class="sk" style="height:420px"></div>`; return; }
   draw();
 }
 
@@ -28,26 +28,27 @@ const avatar = (m, size = 36) => m.avatar ? `<img class="av" src="${esc(m.avatar
 
 function draw() {
   const t = team, s = stats, repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
-  const rankCard = (label, r) => `<div class="card rankcard">${crest(r.rate, 50) || `<span style="width:50px"></span>`}<div>
-    <div class="label">${label}</div>
-    ${r.rate == null ? `<div class="mono muted" style="font-size:28px;font-weight:600">—</div><div class="sub" style="margin-top:0">nothing merged yet</div>`
-      : `<div class="mono" style="font-size:28px;font-weight:600;line-height:1.2;color:${tier(r.rate).c}">${r.rate}%</div><div style="font-size:12px;font-weight:700;color:${tier(r.rate).c}">${tier(r.rate).name}</div>`}</div></div>`;
-  const stat = (label, value, sub) => `<div class="card" style="padding:18px 20px"><div class="label">${label}</div><div class="mono" style="font-size:32px;font-weight:600;line-height:1.2;margin-top:4px">${value}</div><div class="sub" style="margin-top:4px">${sub}</div></div>`;
+  const rankCard = (label, r) => `<div class="card rankcard">${crest(r.rate, 84) || `<span style="width:84px"></span>`}<div>
+    <div class="label" style="font-size:14px">${label}</div>
+    ${r.rate == null ? `<div class="mono muted" style="font-size:40px;font-weight:600">—</div><div class="sub" style="margin-top:0">nothing merged yet</div>`
+      : `<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:12px"><span class="mono" style="font-size:44px;font-weight:600;line-height:1.15;color:${tier(r.rate).c}">${r.rate}%</span><span style="font-size:16px;font-weight:700;color:${tier(r.rate).c}">${tier(r.rate).name}</span></div>
+        <div class="sub" style="margin-top:2px">${r.first} of ${r.total} merged PRs approved on the first review</div>`}</div></div>`;
+  const stat = (label, value, sub) => `<div class="card" style="padding:20px 22px"><div class="label" style="font-size:14px">${label}</div><div class="mono" style="font-size:38px;font-weight:600;line-height:1.2;margin-top:4px">${value}</div><div class="sub" style="margin-top:4px">${sub}</div></div>`;
 
   const wmax = Math.max(1, ...t.weeks.map((w) => w.total));
   const weeksChart = `<figure class="card" style="margin:0;padding:18px 20px;display:flex;flex-direction:column;gap:14px"><figcaption><div style="font-weight:600">Team merged PRs per week</div><div class="sub" style="margin-top:2px">All members, merged to develop</div></figcaption>
-    <div class="bars" aria-label="Team merged PRs per week: ${t.weeks.map((w) => `${day(w.start)} ${w.total}`).join(", ")}">${t.weeks.map((w) => `<div class="bar" tabindex="0" aria-label="Week of ${day(w.start)}: ${w.total} PRs merged">
-      <span class="mono" style="font-size:12px;margin-bottom:4px">${w.total}</span><div style="width:28px;height:${(w.total / wmax) * 130}px;background:var(--accent);border-radius:4px 4px 0 0"></div>
+    <div class="bars" style="height:250px;margin-top:auto" aria-label="Team merged PRs per week: ${t.weeks.map((w) => `${day(w.start)} ${w.total}`).join(", ")}">${t.weeks.map((w) => `<div class="bar" tabindex="0" aria-label="Week of ${day(w.start)}: ${w.total} PRs merged">
+      <span class="mono" style="font-size:12px;margin-bottom:4px">${w.total}</span><div style="width:36px;height:${(w.total / wmax) * 210}px;background:var(--accent);border-radius:4px 4px 0 0"></div>
       <div class="tip"><div class="muted">Week of ${day(w.start)}</div><div>${w.total} PRs merged</div></div></div>`).join("")}</div>
     <div class="xlabels">${t.weeks.map((w) => `<span>${day(w.start)}</span>`).join("")}</div></figure>`;
 
   const bal = [...t.rows].sort((a, b) => b.merged - a.merged), bmax = Math.max(1, ...bal.map((m) => Math.max(m.merged, m.reviews)));
   const balance = `<figure class="card" style="margin:0;padding:18px 20px;display:flex;flex-direction:column;gap:12px"><figcaption><div style="font-weight:600">Review balance</div><div class="sub" style="margin-top:2px">PRs merged vs. reviews given, per member</div></figcaption>
     <div class="legend"><span><i class="swatch" style="background:var(--accent)"></i>Merged</span><span><i class="swatch" style="background:var(--redo)"></i>Reviews given</span></div>
-    <div style="display:flex;flex-direction:column;gap:8px">${bal.map((m) => `<div class="hrow" tabindex="0" aria-label="${esc(m.login)}: ${m.merged} merged, ${m.reviews} reviews given">
-      ${avatar(m, 22)}<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:2px">
-        <div style="width:${(m.merged / bmax) * 100}%;height:7px;background:var(--accent);border-radius:0 4px 4px 0"></div>
-        <div style="width:${(m.reviews / bmax) * 100}%;height:7px;background:var(--redo);border-radius:0 4px 4px 0"></div></div>
+    <div style="display:flex;flex-direction:column;gap:12px">${bal.map((m) => `<div class="hrow" tabindex="0" aria-label="${esc(m.login)}: ${m.merged} merged, ${m.reviews} reviews given">
+      ${avatar(m, 28)}<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:3px">
+        <div style="width:${(m.merged / bmax) * 100}%;height:10px;background:var(--accent);border-radius:0 4px 4px 0"></div>
+        <div style="width:${(m.reviews / bmax) * 100}%;height:10px;background:var(--redo);border-radius:0 4px 4px 0"></div></div>
       <span class="mono" style="width:52px;text-align:right;font-size:11px;color:#B1BAC4">${m.merged} / ${m.reviews}</span>
       <div class="tip" style="left:30%"><div>${esc(m.login)}</div><div class="muted">${m.merged} merged · ${m.reviews} reviews given</div></div></div>`).join("") || `<p class="muted">Nobody merged or reviewed in this period.</p>`}</div></figure>`;
 
@@ -90,15 +91,16 @@ function draw() {
       <div><h1 style="font-size:26px;font-weight:700;letter-spacing:-.01em">Team performance</h1>
         <p class="muted" style="margin:4px 0 0">${org} · ${repoName} · ${t.rows.length} active member${t.rows.length === 1 ? "" : "s"} ${periodLabel(t.period, t.at)}</p></div>
       </div>
-    <section class="team-stats" aria-label="Organization stats">
-      ${rankCard(`Silverback rate · ${repoName}`, t.rate)}${rankCard(`Silverback rate · ${org}`, s.orgRate)}
+    ${rankCard(`Silverback rate · ${repoName}`, t.rate)}
+    ${rankCard(`Silverback rate · ${org}`, s.orgRate)}
+    <section class="team-stats" aria-label="Team stats">
       ${stat("Merged PRs", t.merged, "all members, into develop")}
       ${stat("Median cycle time", t.cycle == null ? "—" : `${t.cycle.toFixed(1)} d`, "opened → merged")}
       ${stat("Open PRs", t.open, `on ${repoName}`)}
       ${stat("Reviews given", t.reviews, "approvals, comments, change requests")}
       ${stat("Active members", t.rows.length, "merged, reviewed or opened")}
     </section>
-    <div class="team-charts">${weeksChart}${balance}${attention}</div>
+    <div class="team-charts">${balance}${weeksChart}${attention}</div>
     ${table}`;
 }
 

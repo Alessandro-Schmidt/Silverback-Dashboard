@@ -175,9 +175,13 @@
   /* Team view */
   .owner-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #2B2112; color: #E3B341; white-space: nowrap; }
   .you-chip { background: #172A4A; color: var(--link); }
-  .team-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
-  .team-stats .rankcard { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
-  .team-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 16px; align-items: start; }
+  .team-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .rankcard { display: flex; align-items: center; gap: 24px; padding: 22px 28px; }
+  /* Review balance and merged-per-week get the room; all three cards share one height */
+  .team-charts { display: grid; grid-template-columns: 1.4fr 1.4fr 1fr; gap: 16px; align-items: stretch; }
+  .team-charts > * { min-width: 0; }
+  @media (max-width: 1100px) { .team-charts { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 720px) { .team-charts { grid-template-columns: 1fr; } }
   .alert { display: flex; gap: 12px; align-items: flex-start; padding: 12px; background: var(--well); border: 1px solid var(--line); border-radius: 8px; }
   .av { width: 36px; height: 36px; border-radius: 999px; flex: none; background: var(--line); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: var(--bg); object-fit: cover; }
   .members { display: grid; grid-template-columns: minmax(240px, 2.2fr) repeat(5, minmax(96px, 1fr)) 120px; gap: 12px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #1C222B; min-width: 980px; box-sizing: border-box; }
