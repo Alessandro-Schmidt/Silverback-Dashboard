@@ -155,6 +155,7 @@
   /* Light refresh (refresh button, period change): page stays readable */
   @keyframes sb-slide { 0% { transform: translateX(-100%) } 100% { transform: translateX(250%) } }
   @keyframes sb-spin { to { transform: rotate(360deg) } }
+  .spin { width: 12px; height: 12px; border: 2px solid var(--edge); border-top-color: var(--accent); border-radius: 50%; animation: sb-spin .8s linear infinite; flex: none; }
   @keyframes sb-thump { 0%,100% { transform: scale(1) } 10% { transform: scale(1.18) } 20% { transform: scale(1) } 30% { transform: scale(1.22) } 42% { transform: scale(1) } }
   header { position: relative; }
   .runner { position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; overflow: hidden; background: #172A4A; display: none; }

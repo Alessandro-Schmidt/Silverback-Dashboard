@@ -117,7 +117,7 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest?.("[data-history]");
   if (!b || !team) return;
   if (!showAll && !history.has(stats.repo)) {
-    b.disabled = true, b.textContent = "Loading every merged PR…";
+    b.disabled = true, b.innerHTML = `<span class="spin" aria-hidden="true"></span>Loading every merged PR…`, b.closest("figure").querySelector(".bars").style.animation = "pulse 1.4s ease-in-out infinite";
     try { history.set(stats.repo, await fetchMergedHistory(token, stats.repo)); }
     catch (err) { b.disabled = false, b.textContent = `Couldn't load the history (${err.message}). Retry`; return; }
   }
