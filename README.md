@@ -68,6 +68,21 @@ organization and repository.
 The stats logic (`extension/lib/stats.js`) and the crest (`extension/lib/crest.js`) live inside the extension so
 it loads as-is; the web app imports them from there, so both always compute the same numbers.
 
+## CLI and MCP server
+
+`cli.js` runs the same stats code from the terminal, read-only, printing JSON. It needs `GITHUB_TOKEN` (or `GH_TOKEN`).
+
+```sh
+node cli.js stats --repo owner/name --period 30   # also: team, history, pr, issue, orgs, repos
+node cli.js help
+```
+
+`node cli.js mcp` serves the same commands as MCP tools over stdio. For Claude Code:
+
+```sh
+claude mcp add silverback -e GITHUB_TOKEN=ghp_... -- node /path/to/cli.js mcp
+```
+
 ## GitHub Pages
 
 `.github/workflows/pages.yml` builds the app and publishes `dist/` on every push to `main`. In the repository's

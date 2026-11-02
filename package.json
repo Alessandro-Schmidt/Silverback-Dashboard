@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "test": "node --test",
-    "android": "vite build && cap sync android && cap open android"
+    "android": "vite build && cap sync android && cap open android",
+    "cli": "node cli.js"
   },
   "repository": {
     "type": "git",
@@ -27,5 +28,8 @@
     "@capacitor/cli": "8.6.0",
     "vite": "8.3.5"
   },
-  "private": true
+  "private": true,
+  "bin": {
+    "silverback": "cli.js"
+  }
 }
