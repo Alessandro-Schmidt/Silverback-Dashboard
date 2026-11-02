@@ -4,6 +4,7 @@ import { crest, explainer, rateChart } from "./extension/lib/crest.js";
 import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, pointLabel, tick, validPeriod, DEFAULT_PERIOD, setStatus, fetchDetail, outlook, tenure, tier, TIERS } from "./extension/lib/stats.js";
 import { renderTeam, loadTeam, rankCard } from "./team.js";
 import "./tooltip.js";
+import "./copy.js";
 
 // Kept in Preferences (Android SharedPreferences "CapacitorStorage"), which the home-screen widget also reads.
 const get = async (key) => (await Preferences.get({ key })).value;
