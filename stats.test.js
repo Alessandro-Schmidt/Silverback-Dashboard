@@ -120,3 +120,16 @@ test("outlook: where an open PR stands for the Silverback rate", () => {
   assert.equal(o(false, "COMMENTED", "APPROVED"), "Approved on first review");
   assert.equal(o(false), "Waiting for first review");
 });
+
+test("fetchOrgHistory halves windows over 1,000 results and pages through each", async () => {
+  const { fetchOrgHistory } = await import("./extension/lib/stats.js");
+  const all = Array.from({ length: 2500 }, (_, i) => ({ mergedAt: new Date(Date.UTC(2020, 0, 1) + i * 36e5).toISOString(), reviews: { nodes: [] } }));
+  globalThis.fetch = async (_, { body }) => {
+    const { variables: { q, after } } = JSON.parse(body), [a, b] = q.match(/merged:(\S+)\.\.(\S+)/).slice(1).map((d) => new Date(d));
+    const hits = all.filter((p) => new Date(p.mergedAt) >= a && new Date(p.mergedAt) <= b), from = Number(after || 0);
+    return { ok: true, json: async () => ({ data: { search: { issueCount: hits.length, nodes: hits.slice(from, from + 100),
+      pageInfo: { hasNextPage: from + 100 < hits.length, endCursor: String(from + 100) } } } }) };
+  };
+  const h = await fetchOrgHistory("t", "o", Date.UTC(2021, 0, 1));
+  assert.equal(h.total, 2500);
+});

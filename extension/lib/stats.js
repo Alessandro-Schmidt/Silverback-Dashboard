@@ -102,7 +102,7 @@ const cycleDays = (p) => (new Date(p.mergedAt) - new Date(p.createdAt)) / 864e5;
 // Merged PRs over the chosen period, for every chart: one point per day (up to 2 weeks), per week (up to 24 weeks)
 // or per month, at most 24 (the most recent). Overall starts at the first merge. Each point: merged count, the
 // Silverback rate (first / total / rate, null with no merges) and the median cycle time in days.
-export function series(prs, since, now) {
+export function series(prs, since, now, max = 24) {
   const first = prs.reduce((m, p) => Math.min(m, new Date(p.mergedAt)), now);
   const start = new Date(+since ? since : first), span = (now - start) / 864e5; // overall (epoch) starts at the first merge
   const unit = span <= 14 ? "day" : span <= 168 ? "week" : "month"; // ≤ 24 weekly points, else monthly
@@ -118,7 +118,7 @@ export function series(prs, since, now) {
     const inB = prs.filter((p) => new Date(p.mergedAt) >= b && new Date(p.mergedAt) < next(b) && new Date(p.mergedAt) >= since);
     out.push({ start: b.getTime(), unit, merged: inB.length, ...silverbackRate(inB), cycle: median(inB.map(cycleDays)) });
   }
-  return out.slice(-24);
+  return out.slice(-max);
 }
 // Axis tick ("26 Oct", "Oct 26") and full label ("29 Oct", "Week of 26 Oct", "October 2026") for a point.
 export const tick = (b) => new Date(b.start).toLocaleDateString("en-GB", b.unit === "month" ? { month: "short", year: "2-digit" } : { day: "numeric", month: "short" });
@@ -233,6 +233,27 @@ export async function fetchStats(token, repo, org, period = DEFAULT_PERIOD) {
   const [core, pulse, mine, repoM, orgM] = await Promise.all([
     gql(token, q.core), gql(token, q.pulse).catch(() => null), gql(token, q.mine), gql(token, q.repo), gql(token, q.org)]);
   return summarize({ ...core, pulse, ...mine, ...repoM, ...orgM }, repo, org, period, now);
+}
+
+// Every merged PR in the org, ever. Search stops at 1,000 results, so a window over that is halved until each fits.
+const ORG_HISTORY = `query($q:String!,$after:String){ search(query:$q,type:ISSUE,first:100,after:$after){ issueCount pageInfo{ hasNextPage endCursor }
+  nodes{ ... on PullRequest { mergedAt ${REVIEWS} } } } }`;
+export async function fetchOrgHistory(token, org, now = Date.now()) {
+  const prs = [], sec = (t) => new Date(Math.floor(t / 1000) * 1000);
+  const walk = async (a, b) => {
+    let after = null, data;
+    do {
+      data = await gql(token, ORG_HISTORY, { q: `org:${org} is:pr is:merged merged:${a.toISOString()}..${b.toISOString()}`, after });
+      if (data.search.issueCount > 1000 && b - a > 1000) {
+        const m = sec((+a + +b) / 2);
+        await walk(a, m);
+        return walk(new Date(+m + 1000), b);
+      }
+      prs.push(...data.search.nodes), after = data.search.pageInfo.endCursor;
+    } while (data.search.pageInfo.hasNextPage);
+  };
+  await walk(new Date("2008-01-01T00:00:00Z"), sec(now));
+  return { rate: silverbackRate(prs), series: series(prs, new Date(0), now, Infinity), total: prs.length };
 }
 
 // ---- Team view ----
