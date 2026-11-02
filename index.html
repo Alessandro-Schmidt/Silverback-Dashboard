@@ -208,12 +208,15 @@
   /* Review balance and merged-per-week get the room; all three cards share one height */
   .team-charts { display: grid; grid-template-columns: 1.4fr 1.4fr 1fr; gap: 16px; align-items: stretch; }
   .team-charts > * { min-width: 0; }
+  .team-charts.wide { grid-template-columns: 1fr 1fr; } .team-charts.wide > [style*="view-transition-name:merged"] { grid-column: 1 / -1; order: 1; }
+  ::view-transition-group(*) { animation-duration: .45s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+  @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none; } }
   /* One fixed height for the three team cards; long lists scroll inside their card */
   .teamcard { margin: 0; padding: 18px 20px; height: 440px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; }
   .teamcard .scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 6px; }
   .teamcard .scroll { scrollbar-width: thin; scrollbar-color: var(--edge) transparent; }
   @media (max-width: 1100px) { .team-charts { grid-template-columns: 1fr 1fr; } }
-  @media (max-width: 720px) { .team-charts { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) { .team-charts, .team-charts.wide { grid-template-columns: 1fr; } }
   .alert { display: flex; gap: 12px; align-items: flex-start; padding: 12px; background: var(--well); border: 1px solid var(--line); border-radius: 8px; }
   .av { width: 36px; height: 36px; border-radius: 999px; flex: none; background: var(--line); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: var(--bg); object-fit: cover; }
   .members { display: grid; grid-template-columns: minmax(240px, 2.2fr) repeat(5, minmax(96px, 1fr)) 120px; gap: 12px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #1C222B; min-width: 980px; box-sizing: border-box; }

@@ -7,7 +7,7 @@ const esc = (v) => String(v).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const day = (t) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 const cache = new Map(); // `${repo}|${period}` → team stats, for the session
 const history = new Map(); // repo → its full merged-PR series, for the session
-let token, showAll = false, team = null, sort = { key: "rate", dir: -1 }, q = "", host, stats;
+let token, showAll = false, loading = false, failed = "", team = null, sort = { key: "rate", dir: -1 }, q = "", host, stats;
 
 export async function loadTeam(tok, s) {
   token = tok;
@@ -39,10 +39,11 @@ export const rankCard = (label, r) => `<div class="card rankcard">${crest(r.rate
 function mergedChart(h, big = false) {
   const t = team, s = stats, all = showAll && history.get(s.repo), pts = all || t.series, wmax = Math.max(1, ...pts.map((b) => b.merged)), unit = pts[0]?.unit || "week";
   const btn = "min-height:32px;font-size:12px";
-  return `<figure class="card teamcard"${big ? ' style="border:0;padding:0"' : ""}><figcaption style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><div style="font-weight:600${big ? ";font-size:18px" : ""}">Team merged PRs per ${unit}</div><div class="sub" style="margin-top:2px">All members, merged to develop, ${all ? "full history" : periodLabel(t.period, t.at)}</div>
-      ${big ? "" : `<button type="button" class="ctl" data-history style="margin-top:8px;${btn}">${all ? `Back to ${periodLabel(t.period, t.at)}` : "Expand to full history"}</button>`}</div>
+  return `<figure class="card teamcard"${big ? ' style="border:0;padding:0"' : ' style="view-transition-name:merged"'}><figcaption style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><div style="font-weight:600${big ? ";font-size:18px" : ""}">Team merged PRs per ${unit}</div><div class="sub" style="margin-top:2px">All members, merged to develop, ${all ? "full history" : periodLabel(t.period, t.at)}</div>
+      ${big ? "" : `<button type="button" class="ctl" data-history style="margin-top:8px;${btn}"${loading ? " disabled" : ""}>${loading ? `<span class="spin" aria-hidden="true"></span>Loading every merged PR…`
+        : failed ? `Couldn't load the history (${esc(failed)}). Retry` : all ? `Back to ${periodLabel(t.period, t.at)}` : "Expand to full history"}</button>`}</div>
       <button type="button" class="ctl" ${big ? "data-zoom-close" : "data-zoom"} style="${btn}" aria-label="${big ? "Close" : "Expand chart"}" title="${big ? "Close" : "Expand chart"}">${big ? "✕" : "⤢"}</button></figcaption>
-    <div class="bars" style="height:${h + 30}px" aria-label="Team merged PRs per ${unit}: ${pts.map((b) => `${pointLabel(b)} ${b.merged}`).join(", ")}">${pts.map((b) => `<div class="bar" tabindex="0" aria-label="${pointLabel(b)}: ${b.merged} PRs merged">
+    <div class="bars" style="height:${h + 30}px${loading && !big ? ";animation:pulse 1.4s ease-in-out infinite" : ""}" aria-label="Team merged PRs per ${unit}: ${pts.map((b) => `${pointLabel(b)} ${b.merged}`).join(", ")}">${pts.map((b) => `<div class="bar" tabindex="0" aria-label="${pointLabel(b)}: ${b.merged} PRs merged">
       ${pts.length <= (big ? 36 : 12) ? `<span class="mono" style="font-size:12px;margin-bottom:4px">${b.merged}</span>` : ""}<div style="width:70%;max-width:${big ? 48 : 36}px;height:${(b.merged / wmax) * h}px;background:var(--accent);border-radius:4px 4px 0 0"></div>
       <div class="tip"><div class="muted">${pointLabel(b)}</div><div>${b.merged} PRs merged</div></div></div>`).join("")}</div>
     <div class="xlabels">${pts.map((b, i) => `<span>${(pts.length - 1 - i) % Math.max(1, Math.ceil(pts.length / (big ? 16 : 7))) ? "" : tick(b)}</span>`).join("")}</div></figure>`;
@@ -67,7 +68,7 @@ function draw() {
   const weeksChart = mergedChart(270);
 
   const bal = [...t.rows].sort((a, b) => b.merged - a.merged), bmax = Math.max(1, ...bal.map((m) => Math.max(m.merged, m.reviews)));
-  const balance = `<figure class="card teamcard"><figcaption><div style="font-weight:600">Review balance</div><div class="sub" style="margin-top:2px">PRs merged vs. reviews given, per member</div></figcaption>
+  const balance = `<figure class="card teamcard" style="view-transition-name:balance"><figcaption><div style="font-weight:600">Review balance</div><div class="sub" style="margin-top:2px">PRs merged vs. reviews given, per member</div></figcaption>
     <div class="legend"><span><i class="swatch" style="background:var(--accent)"></i>Merged</span><span><i class="swatch" style="background:var(--redo)"></i>Reviews given</span></div>
     <div class="scroll" style="display:flex;flex-direction:column;gap:12px">${bal.map((m) => `<div class="hrow" tabindex="0" aria-label="${esc(m.login)}: ${m.merged} merged, ${m.reviews} reviews given">
       ${avatar(m, 28)}<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:3px">
@@ -77,7 +78,7 @@ function draw() {
       <div class="tip"><div>${esc(m.login)}</div><div class="muted">${m.merged} merged · ${m.reviews} reviews given</div></div></div>`).join("") || `<p class="muted">Nobody merged or reviewed in this period.</p>`}</div></figure>`;
 
   const warn = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E3B341" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>`;
-  const attention = `<section class="card teamcard"><h2 style="font-size:15px;font-weight:600">Needs attention</h2>
+  const attention = `<section class="card teamcard" style="view-transition-name:attention"><h2 style="font-size:15px;font-weight:600">Needs attention</h2>
     <div class="scroll" style="display:flex;flex-direction:column;gap:12px">${t.alerts.map((a) => `<div class="alert">${warn}<div><div style="font-weight:600;font-size:13px">${esc(a.title)}</div><div class="sub" style="margin-top:2px">${esc(a.detail)}</div></div></div>`).join("") || `<p class="muted" style="margin:0">Nothing stands out. The troop is in order.</p>`}</div></section>`;
 
   const ql = q.trim().toLowerCase();
@@ -124,21 +125,24 @@ function draw() {
       ${stat("Reviews given", t.reviews, "approvals, comments, change requests")}
       ${stat("Active members", t.rows.length, "merged, reviewed or opened")}
     </section>
-    <div class="team-charts">${balance}${weeksChart}${attention}</div>
+    <div class="team-charts${loading || (showAll && history.has(s.repo)) || t.series.length > 12 ? " wide" : ""}">${balance}${weeksChart}${attention}</div>
     ${table}`;
 }
 
 // Team merges over the repo's whole history: fetched once per repo on demand (it can take a while on busy repos).
+// The chart first moves to a full row of its own (animated), loads there, then shows the history.
+const morph = (fn) => document.startViewTransition ? document.startViewTransition(fn) : fn();
 document.addEventListener("click", async (e) => {
-  const b = e.target.closest?.("[data-history]");
-  if (!b || !team) return;
+  if (!e.target.closest?.("[data-history]") || !team || loading) return;
   if (!showAll && !history.has(stats.repo)) {
-    b.disabled = true, b.innerHTML = `<span class="spin" aria-hidden="true"></span>Loading every merged PR…`, b.closest("figure").querySelector(".bars").style.animation = "pulse 1.4s ease-in-out infinite";
+    loading = true, failed = "", morph(draw);
     try { history.set(stats.repo, await fetchMergedHistory(token, stats.repo)); }
-    catch (err) { b.closest("figure").querySelector(".bars").style.animation = "", b.disabled = false, b.textContent = `Couldn't load the history (${err.message}). Retry`; return; }
+    catch (err) { failed = err.message; }
+    loading = false;
+    if (failed) return morph(draw);
   }
   showAll = !showAll;
-  draw();
+  morph(draw);
 });
 
 // Sorting and search re-draw without refetching.
