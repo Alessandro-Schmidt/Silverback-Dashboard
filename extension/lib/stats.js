@@ -24,10 +24,11 @@ export const queries = (repo, org, since) => {
   };
 };
 
-// Silverback rate: a merged PR is "first try" when no CHANGES_REQUESTED review came before its first APPROVED one.
+// Silverback rate: a merged PR is "first try" when no CHANGES_REQUESTED review came before its first approval.
+// A later push (say, a conflict fix) turns a stale approval into DISMISSED: it still was the approval.
 export function firstTry(pr) {
   const reviews = [...pr.reviews.nodes].sort((a, b) => (a.submittedAt || "").localeCompare(b.submittedAt || ""));
-  const approved = reviews.findIndex((r) => r.state === "APPROVED");
+  const approved = reviews.findIndex((r) => r.state === "APPROVED" || r.state === "DISMISSED");
   return approved >= 0 && !reviews.slice(0, approved).some((r) => r.state === "CHANGES_REQUESTED");
 }
 // { first, total, rate }: rate is a rounded % or null when nothing merged (shown as "—", no badge).

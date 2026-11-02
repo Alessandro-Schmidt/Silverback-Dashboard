@@ -21,8 +21,8 @@ test("summarize: repo and org pulse", () => {
 });
 
 test("firstTry: no change request before the first approval", () => {
-  assert.deepEqual([rev("APPROVED"), rev("COMMENTED", "APPROVED"), rev("CHANGES_REQUESTED", "APPROVED"), rev("APPROVED", "CHANGES_REQUESTED"), rev("COMMENTED"), rev()]
-    .map((reviews) => firstTry({ reviews })), [true, true, false, true, false, false]);
+  assert.deepEqual([rev("APPROVED"), rev("COMMENTED", "APPROVED"), rev("CHANGES_REQUESTED", "APPROVED"), rev("APPROVED", "CHANGES_REQUESTED"), rev("COMMENTED"), rev(), rev("DISMISSED", "APPROVED")]
+    .map((reviews) => firstTry({ reviews })), [true, true, false, true, false, false, true]);
 });
 
 test("tiers at their edges, and no rate with nothing merged", () => {
