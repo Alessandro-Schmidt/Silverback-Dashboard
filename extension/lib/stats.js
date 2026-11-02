@@ -176,7 +176,7 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
   };
 }
 
-async function gql(token, query, variables) {
+export async function gql(token, query, variables) {
   const res = await fetch("https://api.github.com/graphql", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },

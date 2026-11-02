@@ -70,10 +70,11 @@ it loads as-is; the web app imports them from there, so both always compute the 
 
 ## CLI and MCP server
 
-`cli.js` runs the same stats code from the terminal, read-only, printing JSON. It needs `GITHUB_TOKEN` (or `GH_TOKEN`).
+`cli.js` runs the same stats code from the terminal, printing JSON. It needs `GITHUB_TOKEN` (or `GH_TOKEN`). Three commands write to GitHub: `move-issue` (board column), `comment` and `request-review`; the rest only read.
 
 ```sh
-node cli.js stats --repo owner/name --period 30   # also: team, history, pr, issue, orgs, repos
+node cli.js stats --repo owner/name --period 30   # also: team, history, pr, issue, orgs, repos, my-issues, attention
+node cli.js move-issue --repo owner/name --number 42 --status "In progress"
 node cli.js help
 ```
 
