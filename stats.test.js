@@ -121,15 +121,20 @@ test("outlook: where an open PR stands for the Silverback rate", () => {
   assert.equal(o(false), "Waiting for first review");
 });
 
-test("fetchMergedHistory halves windows over 1,000 results and pages through each", async () => {
+test("fetchMergedHistory counts every month from the first merged PR, in chunks of 50", async () => {
   const { fetchMergedHistory } = await import("./extension/lib/stats.js");
-  const all = Array.from({ length: 2500 }, (_, i) => ({ mergedAt: new Date(Date.UTC(2020, 0, 1) + i * 36e5).toISOString(), author: { login: "dev" }, reviews: { nodes: [] } }));
+  const all = Array.from({ length: 2500 }, (_, i) => new Date(Date.UTC(2020, 0, 1) + i * 36e5 * 5));
+  let calls = 0;
   globalThis.fetch = async (_, { body }) => {
-    const { variables: { q, after } } = JSON.parse(body), [a, b] = q.match(/merged:(\S+)\.\.(\S+)/).slice(1).map((d) => new Date(d));
-    const hits = all.filter((p) => new Date(p.mergedAt) >= a && new Date(p.mergedAt) <= b), from = Number(after || 0);
-    return { ok: true, json: async () => ({ data: { search: { issueCount: hits.length, nodes: hits.slice(from, from + 100),
-      pageInfo: { hasNextPage: from + 100 < hits.length, endCursor: String(from + 100) } } } }) };
+    calls++;
+    const { query } = JSON.parse(body), data = {};
+    if (query.includes("sort:created-asc")) data.first = { nodes: [{ createdAt: all[0].toISOString() }] };
+    else for (const [, k, a, b] of query.matchAll(/(m\d+): search\(query:"[^"]*merged:(\S+)\.\.(\S+)"/g))
+      data[k] = { issueCount: all.filter((t) => t >= new Date(a) && t <= new Date(b)).length };
+    return { ok: true, json: async () => ({ data }) };
   };
-  const pts = await fetchMergedHistory("t", "o/r", Date.UTC(2021, 0, 1));
+  const pts = await fetchMergedHistory("t", "o/r", Date.UTC(2025, 6, 1));
   assert.equal(pts.reduce((n, b) => n + b.merged, 0), 2500);
+  assert.equal(pts[0].unit, "month");
+  assert.equal(calls, 1 + Math.ceil(pts.length / 50));
 });

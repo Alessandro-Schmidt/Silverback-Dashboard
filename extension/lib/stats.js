@@ -235,26 +235,21 @@ export async function fetchStats(token, repo, org, period = DEFAULT_PERIOD) {
   return summarize({ ...core, pulse, ...mine, ...repoM, ...orgM }, repo, org, period, now);
 }
 
-// Every PR ever merged into the repo's develop, by people (not bots). Search stops at 1,000 results, so a window
-// over that is halved until each fits.
-const MERGED_HISTORY = `query($q:String!,$after:String){ search(query:$q,type:ISSUE,first:100,after:$after){ issueCount pageInfo{ hasNextPage endCursor }
-  nodes{ ... on PullRequest { createdAt mergedAt author{ login } ${REVIEWS} } } } }`;
+// Merged PRs per month into the repo's develop, over its whole history. The chart only needs counts, so each month is
+// one `issueCount` search (no PR nodes), 50 months per request, all requests in parallel.
+// ponytail: bots are left out by name (search has no "any bot" qualifier); add others here if one shows up.
+const BOTS = "-author:app/dependabot -author:app/renovate -author:app/github-actions";
 export async function fetchMergedHistory(token, repo, now = Date.now()) {
-  const prs = [], sec = (t) => new Date(Math.floor(t / 1000) * 1000);
-  const walk = async (a, b) => {
-    let after = null, data;
-    do {
-      data = await gql(token, MERGED_HISTORY, { q: `repo:${repo} is:pr is:merged base:develop merged:${a.toISOString()}..${b.toISOString()}`, after });
-      if (data.search.issueCount > 1000 && b - a > 1000) {
-        const m = sec((+a + +b) / 2);
-        await walk(a, m);
-        return walk(new Date(+m + 1000), b);
-      }
-      prs.push(...data.search.nodes), after = data.search.pageInfo.endCursor;
-    } while (data.search.pageInfo.hasNextPage);
-  };
-  await walk(new Date("2008-01-01T00:00:00Z"), sec(now));
-  return series(prs.filter((p) => p.author && !p.author.login.endsWith("[bot]")), new Date(0), now, Infinity);
+  const base = `repo:${repo} is:pr is:merged base:develop ${BOTS}`;
+  const first = (await gql(token, `{ ${PR_SEARCH("first", `${base} sort:created-asc`, "nodes{ ... on PullRequest { createdAt } }", 1)} }`)).first.nodes[0];
+  if (!first) return [];
+  const months = [];
+  for (let d = new Date(first.createdAt), m = new Date(d.getFullYear(), d.getMonth(), 1); m <= now; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) months.push(m);
+  const range = (m) => `${m.toISOString()}..${new Date(new Date(m.getFullYear(), m.getMonth() + 1, 1) - 1000).toISOString()}`;
+  const chunks = Array.from({ length: Math.ceil(months.length / 50) }, (_, i) => months.slice(i * 50, i * 50 + 50));
+  const counts = (await Promise.all(chunks.map((c) => gql(token, `{ ${c.map((m, i) => PR_SEARCH(`m${i}`, `${base} merged:${range(m)}`, "issueCount", 1)).join(" ")} }`)
+    .then((d) => c.map((_, i) => d[`m${i}`].issueCount))))).flat();
+  return months.map((m, i) => ({ start: m.getTime(), unit: "month", merged: counts[i] }));
 }
 
 // ---- Team view ----
