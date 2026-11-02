@@ -35,20 +35,36 @@ export const rankCard = (label, r) => `<div class="card rankcard">${crest(r.rate
       : `<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:12px"><span class="mono" style="font-size:44px;font-weight:600;line-height:1.15;color:${tier(r.rate).c}">${r.rate}%</span><span style="font-size:16px;font-weight:700;color:${tier(r.rate).c}">${tier(r.rate).name}</span></div>
         <div class="sub" style="margin-top:2px">${r.first} of ${r.total} merged PRs approved on the first review</div>`}</div></div>`;
 
+// Team merges over the chosen period or the full history (one bar per day, week or month); `big` is the expanded view.
+function mergedChart(h, big = false) {
+  const t = team, s = stats, all = showAll && history.get(s.repo), pts = all || t.series, wmax = Math.max(1, ...pts.map((b) => b.merged)), unit = pts[0]?.unit || "week";
+  const btn = "min-height:32px;font-size:12px";
+  return `<figure class="card teamcard"${big ? ' style="border:0;padding:0"' : ""}><figcaption style="display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><div style="font-weight:600${big ? ";font-size:18px" : ""}">Team merged PRs per ${unit}</div><div class="sub" style="margin-top:2px">All members, merged to develop, ${all ? "full history" : periodLabel(t.period, t.at)}</div>
+      ${big ? "" : `<button type="button" class="ctl" data-history style="margin-top:8px;${btn}">${all ? `Back to ${periodLabel(t.period, t.at)}` : "Expand to full history"}</button>`}</div>
+      <button type="button" class="ctl" ${big ? "data-zoom-close" : "data-zoom"} style="${btn}" aria-label="${big ? "Close" : "Expand chart"}" title="${big ? "Close" : "Expand chart"}">${big ? "✕" : "⤢"}</button></figcaption>
+    <div class="bars" style="height:${h + 30}px" aria-label="Team merged PRs per ${unit}: ${pts.map((b) => `${pointLabel(b)} ${b.merged}`).join(", ")}">${pts.map((b) => `<div class="bar" tabindex="0" aria-label="${pointLabel(b)}: ${b.merged} PRs merged">
+      ${pts.length <= (big ? 36 : 12) ? `<span class="mono" style="font-size:12px;margin-bottom:4px">${b.merged}</span>` : ""}<div style="width:70%;max-width:${big ? 48 : 36}px;height:${(b.merged / wmax) * h}px;background:var(--accent);border-radius:4px 4px 0 0"></div>
+      <div class="tip"><div class="muted">${pointLabel(b)}</div><div>${b.merged} PRs merged</div></div></div>`).join("")}</div>
+    <div class="xlabels">${pts.map((b, i) => `<span>${(pts.length - 1 - i) % Math.max(1, Math.ceil(pts.length / (big ? 16 : 7))) ? "" : tick(b)}</span>`).join("")}</div></figure>`;
+}
+
+// The expanded view: the same chart in a near full-screen dialog.
+const zoom = document.createElement("dialog");
+zoom.className = "explain", zoom.style.cssText = "max-width:1400px;width:calc(100vw - 32px)";
+zoom.setAttribute("aria-label", "Team merged PRs, expanded");
+document.body.append(zoom);
+document.addEventListener("click", (e) => {
+  if (e.target.closest?.("[data-zoom]") && team) zoom.innerHTML = mergedChart(Math.round(innerHeight * 0.6), true), zoom.showModal();
+  else if (e.target.closest?.("[data-zoom-close]") || e.target === zoom) zoom.close();
+});
+
 function draw() {
   const t = team, s = stats, repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
   // Each rate gets half a line, with its chart over the chosen period beside it.
   const rankRow = (label, r, series, who) => `<div class="rankrow">${rankCard(label, r)}${rateChart(series, `${label} over time`, `${who}, ${periodLabel(t.period, t.at)}`)}</div>`;
   const stat = (label, value, sub) => `<div class="card" style="padding:20px 22px"><div class="label" style="font-size:14px">${label}</div><div class="mono" style="font-size:38px;font-weight:600;line-height:1.2;margin-top:4px">${value}</div><div class="sub" style="margin-top:4px">${sub}</div></div>`;
 
-  // Team merges over the chosen period (one bar per day, week or month).
-  const all = showAll && history.get(s.repo), pts = all || t.series, wmax = Math.max(1, ...pts.map((b) => b.merged)), unit = pts[0]?.unit || "week";
-  const weeksChart = `<figure class="card teamcard"><figcaption><div style="font-weight:600">Team merged PRs per ${unit}</div><div class="sub" style="margin-top:2px">All members, merged to develop, ${all ? "full history" : periodLabel(t.period, t.at)}</div>
-      <button type="button" class="ctl" data-history style="margin-top:8px;min-height:32px;font-size:12px">${all ? `Back to ${periodLabel(t.period, t.at)}` : "Expand to full history"}</button></figcaption>
-    <div class="bars" style="height:270px" aria-label="Team merged PRs per ${unit}: ${pts.map((b) => `${pointLabel(b)} ${b.merged}`).join(", ")}">${pts.map((b) => `<div class="bar" tabindex="0" aria-label="${pointLabel(b)}: ${b.merged} PRs merged">
-      ${pts.length <= 12 ? `<span class="mono" style="font-size:12px;margin-bottom:4px">${b.merged}</span>` : ""}<div style="width:70%;max-width:36px;height:${(b.merged / wmax) * 240}px;background:var(--accent);border-radius:4px 4px 0 0"></div>
-      <div class="tip"><div class="muted">${pointLabel(b)}</div><div>${b.merged} PRs merged</div></div></div>`).join("")}</div>
-    <div class="xlabels">${pts.map((b, i) => `<span>${(pts.length - 1 - i) % Math.max(1, Math.ceil(pts.length / 7)) ? "" : tick(b)}</span>`).join("")}</div></figure>`;
+  const weeksChart = mergedChart(270);
 
   const bal = [...t.rows].sort((a, b) => b.merged - a.merged), bmax = Math.max(1, ...bal.map((m) => Math.max(m.merged, m.reviews)));
   const balance = `<figure class="card teamcard"><figcaption><div style="font-weight:600">Review balance</div><div class="sub" style="margin-top:2px">PRs merged vs. reviews given, per member</div></figcaption>
