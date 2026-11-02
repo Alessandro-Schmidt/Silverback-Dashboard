@@ -1,12 +1,12 @@
 // Team view (design board "Team"), open to everyone: the repo's and org's Silverback rate,
 // team totals, merged over the period, review balance, things that need attention, and a sortable members table.
 import { crest, rateChart } from "./extension/lib/crest.js";
-import { fetchTeam, fetchOrgHistory, periodLabel, pointLabel, tick, tier } from "./extension/lib/stats.js";
+import { fetchTeam, fetchMergedHistory, periodLabel, pointLabel, tick, tier } from "./extension/lib/stats.js";
 
 const esc = (v) => String(v).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const day = (t) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 const cache = new Map(); // `${repo}|${period}` → team stats, for the session
-const history = new Map(); // org → its full merged-PR history, for the session
+const history = new Map(); // repo → its full merged-PR series, for the session
 let token, showAll = false, team = null, sort = { key: "rate", dir: -1 }, q = "", host, stats;
 
 export async function loadTeam(tok, s) {
@@ -38,13 +38,13 @@ export const rankCard = (label, r) => `<div class="card rankcard">${crest(r.rate
 function draw() {
   const t = team, s = stats, repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
   // Each rate gets half a line, with its chart over the chosen period beside it.
-  const rankRow = (label, r, series, who, when = periodLabel(t.period, t.at)) => `<div class="rankrow">${rankCard(label, r)}${rateChart(series, `${label} over time`, `${who}, ${when}`)}</div>`;
-  const all = showAll && history.get(s.org);
+  const rankRow = (label, r, series, who) => `<div class="rankrow">${rankCard(label, r)}${rateChart(series, `${label} over time`, `${who}, ${periodLabel(t.period, t.at)}`)}</div>`;
   const stat = (label, value, sub) => `<div class="card" style="padding:20px 22px"><div class="label" style="font-size:14px">${label}</div><div class="mono" style="font-size:38px;font-weight:600;line-height:1.2;margin-top:4px">${value}</div><div class="sub" style="margin-top:4px">${sub}</div></div>`;
 
   // Team merges over the chosen period (one bar per day, week or month).
-  const pts = t.series, wmax = Math.max(1, ...pts.map((b) => b.merged)), unit = pts[0]?.unit || "week";
-  const weeksChart = `<figure class="card teamcard"><figcaption><div style="font-weight:600">Team merged PRs per ${unit}</div><div class="sub" style="margin-top:2px">All members, merged to develop, ${periodLabel(t.period, t.at)}</div></figcaption>
+  const all = showAll && history.get(s.repo), pts = all || t.series, wmax = Math.max(1, ...pts.map((b) => b.merged)), unit = pts[0]?.unit || "week";
+  const weeksChart = `<figure class="card teamcard"><figcaption><div style="font-weight:600">Team merged PRs per ${unit}</div><div class="sub" style="margin-top:2px">All members, merged to develop, ${all ? "full history" : periodLabel(t.period, t.at)}</div>
+      <button type="button" class="ctl" data-history style="margin-top:8px;min-height:32px;font-size:12px">${all ? `Back to ${periodLabel(t.period, t.at)}` : "Expand to full history"}</button></figcaption>
     <div class="bars" style="height:270px" aria-label="Team merged PRs per ${unit}: ${pts.map((b) => `${pointLabel(b)} ${b.merged}`).join(", ")}">${pts.map((b) => `<div class="bar" tabindex="0" aria-label="${pointLabel(b)}: ${b.merged} PRs merged">
       ${pts.length <= 12 ? `<span class="mono" style="font-size:12px;margin-bottom:4px">${b.merged}</span>` : ""}<div style="width:70%;max-width:36px;height:${(b.merged / wmax) * 240}px;background:var(--accent);border-radius:4px 4px 0 0"></div>
       <div class="tip"><div class="muted">${pointLabel(b)}</div><div>${b.merged} PRs merged</div></div></div>`).join("")}</div>
@@ -100,9 +100,7 @@ function draw() {
         <p class="muted" style="margin:4px 0 0">${org} · ${repoName} · ${t.rows.length} active member${t.rows.length === 1 ? "" : "s"} ${periodLabel(t.period, t.at)}</p></div>
       </div>
     ${rankRow(`Silverback rate · ${repoName}`, t.rate, t.series, "Every author's PRs merged into develop")}
-    ${all ? rankRow(`Silverback rate · ${org}`, all.rate, all.series, `All ${all.total} PRs ever merged across the organization`, "full history")
-      : rankRow(`Silverback rate · ${org}`, s.orgRate, s.orgSeries, "PRs merged across the organization")}
-    <div style="display:flex;justify-content:flex-end;margin-top:-8px"><button type="button" class="ctl" data-org-history>${all ? `Back to ${periodLabel(t.period, t.at)}` : `Expand ${org} to its full history`}</button></div>
+    ${rankRow(`Silverback rate · ${org}`, s.orgRate, s.orgSeries, "PRs merged across the organization")}
     <section class="team-stats" aria-label="Team stats">
       ${stat("Merged PRs", t.merged, "all members, into develop")}
       ${stat("Median cycle time", t.cycle == null ? "—" : `${t.cycle.toFixed(1)} d`, "opened → merged")}
@@ -114,13 +112,13 @@ function draw() {
     ${table}`;
 }
 
-// The org rate over its whole history: fetched once per org on demand (it can take a while on big orgs).
+// Team merges over the repo's whole history: fetched once per repo on demand (it can take a while on busy repos).
 document.addEventListener("click", async (e) => {
-  const b = e.target.closest?.("[data-org-history]");
+  const b = e.target.closest?.("[data-history]");
   if (!b || !team) return;
-  if (!showAll && !history.has(stats.org)) {
+  if (!showAll && !history.has(stats.repo)) {
     b.disabled = true, b.textContent = "Loading every merged PR…";
-    try { history.set(stats.org, await fetchOrgHistory(token, stats.org)); }
+    try { history.set(stats.repo, await fetchMergedHistory(token, stats.repo)); }
     catch (err) { b.disabled = false, b.textContent = `Couldn't load the history (${err.message}). Retry`; return; }
   }
   showAll = !showAll;

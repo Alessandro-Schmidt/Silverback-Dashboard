@@ -235,15 +235,16 @@ export async function fetchStats(token, repo, org, period = DEFAULT_PERIOD) {
   return summarize({ ...core, pulse, ...mine, ...repoM, ...orgM }, repo, org, period, now);
 }
 
-// Every merged PR in the org, ever. Search stops at 1,000 results, so a window over that is halved until each fits.
-const ORG_HISTORY = `query($q:String!,$after:String){ search(query:$q,type:ISSUE,first:100,after:$after){ issueCount pageInfo{ hasNextPage endCursor }
-  nodes{ ... on PullRequest { mergedAt ${REVIEWS} } } } }`;
-export async function fetchOrgHistory(token, org, now = Date.now()) {
+// Every PR ever merged into the repo's develop, by people (not bots). Search stops at 1,000 results, so a window
+// over that is halved until each fits.
+const MERGED_HISTORY = `query($q:String!,$after:String){ search(query:$q,type:ISSUE,first:100,after:$after){ issueCount pageInfo{ hasNextPage endCursor }
+  nodes{ ... on PullRequest { createdAt mergedAt author{ login } ${REVIEWS} } } } }`;
+export async function fetchMergedHistory(token, repo, now = Date.now()) {
   const prs = [], sec = (t) => new Date(Math.floor(t / 1000) * 1000);
   const walk = async (a, b) => {
     let after = null, data;
     do {
-      data = await gql(token, ORG_HISTORY, { q: `org:${org} is:pr is:merged merged:${a.toISOString()}..${b.toISOString()}`, after });
+      data = await gql(token, MERGED_HISTORY, { q: `repo:${repo} is:pr is:merged base:develop merged:${a.toISOString()}..${b.toISOString()}`, after });
       if (data.search.issueCount > 1000 && b - a > 1000) {
         const m = sec((+a + +b) / 2);
         await walk(a, m);
@@ -253,7 +254,7 @@ export async function fetchOrgHistory(token, org, now = Date.now()) {
     } while (data.search.pageInfo.hasNextPage);
   };
   await walk(new Date("2008-01-01T00:00:00Z"), sec(now));
-  return { rate: silverbackRate(prs), series: series(prs, new Date(0), now, Infinity), total: prs.length };
+  return series(prs.filter((p) => p.author && !p.author.login.endsWith("[bot]")), new Date(0), now, Infinity);
 }
 
 // ---- Team view ----
