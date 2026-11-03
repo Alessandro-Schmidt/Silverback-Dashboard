@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, series, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam, outlook } from "./extension/lib/stats.js";
+import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, series, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam, outlook, repoRanks } from "./extension/lib/stats.js";
 
 const rev = (...states) => ({ nodes: states.map((state, i) => ({ state, submittedAt: `2026-10-0${i + 1}T10:00:00Z`, author: { login: "rev" } })) });
 const base = (extra = {}) => ({
@@ -30,6 +30,12 @@ test("firstTry: draft commits are fine, commits after opening for review are not
   const pr = (...items) => ({ createdAt: "2026-09-10T10:00:00Z", reviews: rev("APPROVED"), timelineItems: { nodes: items } });
   assert.deepEqual([pr(c(11), c(15), ready), pr(c(11), ready, c(25)), pr(c(11), c(25)), pr(c("09"))].map(firstTry), [true, false, false, true]);
   assert.equal(firstTry({ ...pr(ready), reviews: rev("APPROVED"), timelineItems: { nodes: [ready, { commit: { committedDate: "2026-10-05T10:00:00Z" } }] } }), true);
+});
+
+test("repoRanks: best rate first, more merges break ties", () => {
+  const p = (name, ...s) => ({ repository: { name }, reviews: rev(...s) });
+  assert.deepEqual(repoRanks([p("a", "CHANGES_REQUESTED", "APPROVED"), p("b", "APPROVED"), p("c", "APPROVED"), p("c", "APPROVED"), p("a", "APPROVED")]).map((r) => [r.name, r.rate]),
+    [["c", 100], ["b", 100], ["a", 50]]);
 });
 
 test("tiers at their edges, and no rate with nothing merged", () => {

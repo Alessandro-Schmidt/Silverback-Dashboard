@@ -22,7 +22,7 @@ export const queries = (repo, org, since) => {
       ${PR_SEARCH("orgOpen", `org:${org} is:pr is:open`, "issueCount", 1)} }`,
     mine: `{ ${PR_SEARCH("myDevelop", `${develop}${after} sort:updated-desc`, `nodes{ ... on PullRequest { createdAt mergedAt additions deletions ${REVIEWS} } }`)} }`,
     repo: `{ ${PR_SEARCH("repoMerged", `repo:${repo} is:pr is:merged base:develop${after}`, `nodes{ ... on PullRequest { mergedAt ${REVIEWS} } }`)} }`,
-    org: `{ ${PR_SEARCH("orgMerged", `org:${org} is:pr is:merged${after}`, `nodes{ ... on PullRequest { mergedAt ${REVIEWS} } }`)} }`,
+    org: `{ ${PR_SEARCH("orgMerged", `org:${org} is:pr is:merged${after}`, `nodes{ ... on PullRequest { mergedAt repository{ name } ${REVIEWS} } }`)} }`,
   };
 };
 
@@ -46,6 +46,12 @@ function pushedInReview(pr, until) {
 export function silverbackRate(prs) {
   const first = prs.filter(firstTry).length;
   return { first, total: prs.length, rate: prs.length ? Math.round((first / prs.length) * 100) : null };
+}
+
+// The org's repos by Silverback rate, best first (ties: more merges first).
+export function repoRanks(prs) {
+  const by = Map.groupBy(prs.filter((p) => p.repository), (p) => p.repository.name);
+  return [...by].map(([name, ps]) => ({ name, ...silverbackRate(ps) })).sort((a, b) => b.rate - a.rate || b.total - a.total);
 }
 
 // Tiers ("Primate Snobbery"), best first: colour, dark shade for the crest, and stars on the crest.
@@ -178,7 +184,7 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
     myMerged: data.myMerged.issueCount,
     // Lines added and removed by your PRs merged into develop in the period (GitHub's green ++ and red --).
     lines: mergedMine.reduce((l, p) => ({ added: l.added + (p.additions || 0), removed: l.removed + (p.deletions || 0) }), { added: 0, removed: 0 }),
-    mine, repoRate: silverbackRate(data.repoMerged.nodes), orgRate: silverbackRate(data.orgMerged.nodes),
+    mine, repoRate: silverbackRate(data.repoMerged.nodes), orgRate: silverbackRate(data.orgMerged.nodes), repoRanks: repoRanks(data.orgMerged.nodes),
     mySeries: series(data.myDevelop.nodes, since, now), repoSeries: series(data.repoMerged.nodes, since, now), orgSeries: series(data.orgMerged.nodes, since, now),
     newIssues: data.myIssues.nodes.filter((i) => recent(i.createdAt)).length,
     // ponytail: GitHub only exposes org join dates to admins, so tenure starts at the first PR or issue you opened in the org.

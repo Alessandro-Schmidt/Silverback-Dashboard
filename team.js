@@ -118,6 +118,11 @@ function draw() {
       </div>
     ${rankRow(`Silverback rate · ${repoName}`, t.rate, t.series, "Every author's PRs merged into develop")}
     ${rankRow(`Silverback rate · ${org}`, s.orgRate, s.orgSeries, "PRs merged across the organization")}
+    ${s.repoRanks?.length ? `<section class="card" style="padding:16px 20px"><h2 class="section-title">Repositories by Silverback rate <span class="muted" style="font-weight:500">${s.repoRanks.length}</span></h2>
+      <div class="sub" style="margin:2px 0 12px">PRs merged across ${org}, ${periodLabel(s.period, s.at)}</div>
+      <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px">${s.repoRanks.map((r, i) => `<li style="display:flex;align-items:center;gap:12px">
+        <span class="mono muted" style="width:24px;text-align:right">${i + 1}</span><span style="flex:1;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</span>
+        <span class="muted" style="font-size:13px">${r.first}/${r.total}</span><span style="display:flex;align-items:center;gap:8px;width:96px">${rateCell(r.rate)}</span></li>`).join("")}</ol></section>` : ""}
     <section class="team-stats" aria-label="Team stats">
       ${stat("Merged PRs", t.merged, "all members, into develop")}
       ${stat("Median cycle time", t.cycle == null ? "—" : `${t.cycle.toFixed(1)} d`, "opened → merged")}
