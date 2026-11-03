@@ -71,6 +71,10 @@ export const ratePage = () => `<article class="card rate-page" style="max-width:
   <ol><li>It was <b>approved</b>.</li>
     <li><b>No reviewer requested changes</b> before the first approval.</li>
     <li><b>No commit was pushed</b> while it waited for that approval, counting from when it was last marked ready for review (or opened, if never a draft).</li></ol>
+  <h2>What hurts you</h2>
+  <ul><li>A reviewer <b>requesting changes</b> before the PR is approved.</li>
+    <li><b>Pushing a commit</b> after opening the PR for review, before it is approved.</li>
+    <li>Merging a PR <b>without any approval</b>.</li></ul>
   <h2>What doesn't hurt you</h2>
   <ul><li>Commits pushed while the PR is still a draft.</li><li>Comments that aren't change requests.</li>
     <li>Pushes after the approval, like a conflict fix: GitHub dismisses the approval, but it still counts.</li></ul>
