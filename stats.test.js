@@ -25,6 +25,13 @@ test("firstTry: no change request before the first approval", () => {
     .map((reviews) => firstTry({ reviews })), [true, true, false, true, false, false, true]);
 });
 
+test("firstTry: draft commits are fine, commits after opening for review are not", () => {
+  const c = (d) => ({ commit: { committedDate: `2026-09-${d}T10:00:00Z` } }), ready = { createdAt: "2026-09-20T10:00:00Z" };
+  const pr = (...items) => ({ createdAt: "2026-09-10T10:00:00Z", reviews: rev("APPROVED"), timelineItems: { nodes: items } });
+  assert.deepEqual([pr(c(11), c(15), ready), pr(c(11), ready, c(25)), pr(c(11), c(25)), pr(c("09"))].map(firstTry), [true, false, false, true]);
+  assert.equal(firstTry({ ...pr(ready), reviews: rev("APPROVED"), timelineItems: { nodes: [ready, { commit: { committedDate: "2026-10-05T10:00:00Z" } }] } }), true);
+});
+
 test("tiers at their edges, and no rate with nothing merged", () => {
   assert.deepEqual([0, 29, 30, 59, 60, 89, 90, 100].map((r) => tier(r).name),
     ["Code Monkey", "Code Monkey", "Merge Chimp", "Merge Chimp", "Silverback", "Silverback", "King of the Repo", "King of the Repo"]);

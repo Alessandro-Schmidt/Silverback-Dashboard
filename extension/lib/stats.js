@@ -1,7 +1,9 @@
 // The stats come from five small GraphQL queries run in parallel. One big query used to pass GitHub's ~10 s limit
 // (GitHub then answers 502 without CORS headers, which the browser reports as "Failed to fetch").
 // Personal stats are scoped to the configured repo; @me is the token's owner.
-const REVIEWS = "reviews(first:50){ nodes{ state submittedAt } }";
+// Commits and "ready for review" events, so a push after leaving draft can be told apart from draft work.
+const PUSHES = "createdAt timelineItems(last:100,itemTypes:[READY_FOR_REVIEW_EVENT,PULL_REQUEST_COMMIT]){ nodes{ ... on ReadyForReviewEvent{ createdAt } ... on PullRequestCommit{ commit{ committedDate } } } }";
+const REVIEWS = `reviews(first:50){ nodes{ state submittedAt } } ${PUSHES}`;
 const PR_SEARCH = (alias, q, fields, first = 100) => `${alias}: search(query:"${q.replace(/"/g, '\\"')}",type:ISSUE,first:${first}){ ${fields} }`;
 export const queries = (repo, org, since) => {
   const [owner, name] = repo.split("/"), after = ` merged:>=${since.toISOString()}`;
@@ -25,11 +27,20 @@ export const queries = (repo, org, since) => {
 };
 
 // Silverback rate: a merged PR is "first try" when no CHANGES_REQUESTED review came before its first approval.
+// Commits pushed while still a draft are fine; a commit after the PR was opened for review (and before that approval) is not.
 // A later push (say, a conflict fix) turns a stale approval into DISMISSED: it still was the approval.
 export function firstTry(pr) {
   const reviews = [...pr.reviews.nodes].sort((a, b) => (a.submittedAt || "").localeCompare(b.submittedAt || ""));
   const approved = reviews.findIndex((r) => r.state === "APPROVED" || r.state === "DISMISSED");
-  return approved >= 0 && !reviews.slice(0, approved).some((r) => r.state === "CHANGES_REQUESTED");
+  return approved >= 0 && !reviews.slice(0, approved).some((r) => r.state === "CHANGES_REQUESTED") && !pushedInReview(pr, reviews[approved].submittedAt);
+}
+// Any commit after the PR last became ready for review (or was opened, if never a draft) and before `until`.
+// ponytail: uses committedDate, which a rebase resets; pushedDate is gone from the API.
+function pushedInReview(pr, until) {
+  const items = pr.timelineItems?.nodes;
+  if (!items) return false;
+  const ready = items.filter((i) => !i.commit && i.createdAt).map((i) => i.createdAt).sort().pop() || pr.createdAt;
+  return items.some((i) => i.commit && i.commit.committedDate > ready && (!until || i.commit.committedDate < until));
 }
 // { first, total, rate }: rate is a rounded % or null when nothing merged (shown as "—", no badge).
 export function silverbackRate(prs) {
@@ -197,7 +208,7 @@ export const setStatus = (token, { project, item, field }, optionId) =>
 // Everything the details drawer shows, fetched when it opens: kind is "pr" or "issue".
 const DETAIL = {
   pr: `pullRequest(number:$n){ number title url isDraft createdAt headRefName baseRefName additions deletions changedFiles comments{totalCount}
-    reviews(first:50){ nodes{ state submittedAt author{ login } } } reviewRequests(first:10){ nodes{ requestedReviewer{ ... on User{ login } } } }
+    reviews(first:50){ nodes{ state submittedAt author{ login } } } ${PUSHES} reviewRequests(first:10){ nodes{ requestedReviewer{ ... on User{ login } } } }
     commits(last:1){ nodes{ commit{ statusCheckRollup{ state } } } } closingIssuesReferences(first:1){ nodes{ number title } } }`,
   issue: `issue(number:$n){ number title url createdAt bodyHTML issueType{ name } labels(first:10){ nodes{ name color } } assignees(first:5){ nodes{ login } }
     subIssues(first:30){ nodes{ number title state } } closedByPullRequestsReferences(first:1){ nodes{ number title isDraft } }
@@ -216,6 +227,7 @@ export function outlook(pr) {
   const states = pr.reviews.nodes.map((r) => r.state);
   if (pr.isDraft) return ["Draft · not in review yet", "Mark it ready; it can still be a first try.", "#9AA4B2"];
   if (states.includes("CHANGES_REQUESTED")) return ["Changes requested", "Won’t count as a first try when merged.", "#D07A2A"];
+  if (!states.some((st) => st === "APPROVED" || st === "DISMISSED") && pushedInReview(pr)) return ["Pushed after opening for review", "Won’t count as a first try when merged; draft commits are fine.", "#D07A2A"];
   if (firstTry(pr)) return ["Approved on first review", "Counts toward your Silverback rate once merged.", "#56D364"];
   return ["Waiting for first review", "Still on track for a first try.", "#4C8DFF"];
 }
@@ -258,7 +270,7 @@ const TEAM_QUERY = `query($org:String!,$q:String!,$after:String){
   organization(login:$org){ membersWithRole(first:100){ edges{ role node{ login avatarUrl } } } }
   search(query:$q,type:ISSUE,first:100,after:$after){ pageInfo{ hasNextPage endCursor } nodes{ ... on PullRequest {
     number title url isDraft state createdAt mergedAt baseRefName author{ login avatarUrl }
-    reviews(first:50){ nodes{ state submittedAt author{ login } } } } } }
+    reviews(first:50){ nodes{ state submittedAt author{ login } } } ${PUSHES} } } }
 }`;
 
 // Every PR of the repo touched since the period start, with its reviews.
