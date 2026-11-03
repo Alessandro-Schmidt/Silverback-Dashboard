@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, series, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam, outlook, repoRanks } from "./extension/lib/stats.js";
+import { summarize, firstTry, silverbackRate, tier, toNextTier, workdaysSince, tenure, series, periodStart, periodOption, periodLabel, PERIOD_ORDER, PERIODS, sideEye, summarizeTeam, outlook, repoRanks, prRates } from "./extension/lib/stats.js";
 
 const rev = (...states) => ({ nodes: states.map((state, i) => ({ state, submittedAt: `2026-10-0${i + 1}T10:00:00Z`, author: { login: "rev" } })) });
 const base = (extra = {}) => ({
@@ -36,6 +36,12 @@ test("repoRanks: best rate first, more merges break ties", () => {
   const p = (name, ...s) => ({ repository: { name }, reviews: rev(...s) });
   assert.deepEqual(repoRanks([p("a", "CHANGES_REQUESTED", "APPROVED"), p("b", "APPROVED"), p("c", "APPROVED"), p("c", "APPROVED"), p("a", "APPROVED")]).map((r) => [r.name, r.rate]),
     [["c", 100], ["b", 100], ["a", 50]]);
+});
+
+test("prRates: running rate after each PR, oldest first, with how much it moved", () => {
+  const p = (n, d, ...st) => ({ number: n, mergedAt: `2026-10-0${d}T10:00:00Z`, reviews: rev(...st) });
+  assert.deepEqual(prRates([p(3, 3, "APPROVED"), p(1, 1, "APPROVED"), p(2, 2, "CHANGES_REQUESTED", "APPROVED")]).map((r) => [r.pr.number, r.rate, r.delta]),
+    [[1, 100, null], [2, 50, -50], [3, 67, 17]]);
 });
 
 test("tiers at their edges, and no rate with nothing merged", () => {

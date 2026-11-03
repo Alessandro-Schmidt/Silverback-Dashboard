@@ -116,7 +116,7 @@ function render(s) {
           <div style="width:${r.rate ?? 0}%;background:${t ? t.c : "transparent"}"></div><i style="left:30%"></i><i style="left:60%"></i><i style="left:90%"></i></div>
         <div class="tiers">${[...TIERS].reverse().map((x) => `<span>${x.min === 90 ? "King" : x.name}</span>`).join("")}</div></div>
     </div>
-    ${rateChart(s.mySeries, "Your Silverback rate over time", `Your PRs merged into develop, ${periodLabel(s.period, s.at)}`)}
+    ${rateChart(s.myPrRates || s.mySeries, "Your Silverback rate over time", `One point per PR merged into develop ${periodLabel(s.period, s.at)}: green was a first try, red needed changes. Hover for how much it moved your rate.`)}
   </section>
   <section class="rankcards" aria-label="Silverback rate of the repository and the organization">
     ${rankCard(`Silverback rate · ${repoName}`, s.repoRate)}${rankCard(`Silverback rate · ${org}`, s.orgRate)}

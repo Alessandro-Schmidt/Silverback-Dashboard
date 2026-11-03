@@ -20,7 +20,7 @@ export const queries = (repo, org, since) => {
     // Org pulse: one search counts the open PRs (instead of 100 per-repo counts); top 3 languages per repo, by size.
     pulse: `{ organization(login:"${org}"){ repositories(first:100){ totalCount nodes{ languages(first:3,orderBy:{field:SIZE,direction:DESC}){ edges{ size node{ name } } } } } }
       ${PR_SEARCH("orgOpen", `org:${org} is:pr is:open`, "issueCount", 1)} }`,
-    mine: `{ ${PR_SEARCH("myDevelop", `${develop}${after} sort:updated-desc`, `nodes{ ... on PullRequest { createdAt mergedAt additions deletions ${REVIEWS} } }`)} }`,
+    mine: `{ ${PR_SEARCH("myDevelop", `${develop}${after} sort:updated-desc`, `nodes{ ... on PullRequest { number title createdAt mergedAt additions deletions ${REVIEWS} } }`)} }`,
     repo: `{ ${PR_SEARCH("repoMerged", `repo:${repo} is:pr is:merged base:develop${after}`, `nodes{ ... on PullRequest { mergedAt ${REVIEWS} } }`)} }`,
     // Paged with $after (see fetchOrgMerged): same rules as the repo, develop only and no bots.
     org: `query($after:String){ orgMerged: search(query:"org:${org} is:pr is:merged base:develop ${BOTS}${after}",type:ISSUE,first:100,after:$after){
@@ -141,6 +141,16 @@ export function series(prs, since, now, max = 24) {
 }
 // Axis tick ("26 Oct", "Oct 26") and full label ("29 Oct", "Week of 26 Oct", "October 2026") for a point.
 export const tick = (b) => new Date(b.start).toLocaleDateString("en-GB", b.unit === "month" ? { month: "short", year: "2-digit" } : { day: "numeric", month: "short" });
+// One point per merged PR, oldest first: the running rate after it, and how many points it moved it (null for the first).
+export function prRates(prs) {
+  let first = 0, prev = null;
+  return [...prs].sort((a, b) => a.mergedAt.localeCompare(b.mergedAt)).map((p, i) => {
+    const ok = firstTry(p), rate = Math.round(((first += ok) / (i + 1)) * 100), delta = prev == null ? null : rate - prev;
+    prev = rate;
+    return { start: new Date(p.mergedAt).getTime(), unit: "day", pr: { number: p.number, title: p.title || "", ok }, rate, first, total: i + 1, delta };
+  });
+}
+
 export const pointLabel = (b) => b.unit === "month" ? new Date(b.start).toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : `${b.unit === "week" ? "Week of " : ""}${tick(b)}`;
 
 // "Side-eye": things waiting on you. Stale drafts, PRs nobody reviewed yet, issues ready for dev.
@@ -187,7 +197,7 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
     // Lines added and removed by your PRs merged into develop in the period (GitHub's green ++ and red --).
     lines: mergedMine.reduce((l, p) => ({ added: l.added + (p.additions || 0), removed: l.removed + (p.deletions || 0) }), { added: 0, removed: 0 }),
     mine, repoRate: silverbackRate(data.repoMerged.nodes), orgRate: silverbackRate(data.orgMerged.nodes), repoRanks: repoRanks(data.orgMerged.nodes),
-    mySeries: series(data.myDevelop.nodes, since, now), repoSeries: series(data.repoMerged.nodes, since, now), orgSeries: series(data.orgMerged.nodes, since, now),
+    mySeries: series(data.myDevelop.nodes, since, now), myPrRates: prRates(mergedMine), repoSeries: series(data.repoMerged.nodes, since, now), orgSeries: series(data.orgMerged.nodes, since, now),
     newIssues: data.myIssues.nodes.filter((i) => recent(i.createdAt)).length,
     // ponytail: GitHub only exposes org join dates to admins, so tenure starts at the first PR or issue you opened in the org.
     firstInOrg: data.myFirst.nodes[0]?.createdAt || null,

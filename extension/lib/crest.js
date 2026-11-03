@@ -87,14 +87,17 @@ export const ratePage = () => `<article class="card rate-page" style="max-width:
     <li>Only the last 100 commits and the first 50 reviews of a PR are looked at.</li></ul>
 </article>`;
 
-// Silverback rate over time (one point per day, week or month from series), on faint tier bands.
+// Silverback rate over time (one point per day, week or month from series, or per PR from prRates), on faint tier bands.
 export function rateChart(series, title, sub) {
   // Drawn at ~600 px wide (its usual size: half the page) so the labels keep their real size.
   const W = 600, L = 44, R = W - 12, n = series.length, x = (i) => (n > 1 ? L + (i * (R - L)) / (n - 1) : (L + R) / 2), y = (v) => 140 - v * 1.2;
   const known = series.map((b, i) => ({ ...b, i })).filter((b) => b.rate != null);
   const every = Math.max(1, Math.ceil(n / 8)); // ticks counted back from the last point, so it never collides
   const bands = [[0, 30, "#F85149"], [30, 60, "#E3B341"], [60, 90, "#56D364"], [90, 100, "#F5C84C"]];
-  const last = known.at(-1);
+  const last = known.at(-1), q = (t) => String(t).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  // Per PR: "#12 Fix login · first try · +3 pts → 67%".
+  const tip = (b) => b.pr ? q(`#${b.pr.number} ${b.pr.title} · ${b.pr.ok ? "first try" : "needed changes"} · ${b.delta == null ? "first PR" : `${b.delta > 0 ? "+" : ""}${b.delta} pts`} → ${b.rate}% (${b.first} of ${b.total})`)
+    : `${pointLabel(b)}: ${b.rate}% · ${tier(b.rate).name} (${b.first} of ${b.total})`;
   return `<figure class="card ratechart"><figcaption><div style="font-weight:600">${title}</div><div class="sub" style="margin-top:2px">${sub}</div></figcaption>
     <svg viewBox="0 0 ${W} 166" width="100%" role="img" style="display:block;overflow:visible;max-height:220px" aria-label="${title}: ${known.map((b) => `${pointLabel(b)} ${b.rate}%`).join(", ") || "no merged PRs in this period"}">
       ${bands.map(([a, b, c]) => `<rect x="${L}" y="${y(b)}" width="${R - L}" height="${(b - a) * 1.2}" fill="${c}" opacity=".07"/>`).join("")}
@@ -103,7 +106,7 @@ export function rateChart(series, title, sub) {
       <g fill="#9AA4B2" font-size="11" font-family="Inter, sans-serif" text-anchor="end">${[0, 30, 60, 90].map((v) => `<text x="${L - 8}" y="${y(v) + 4}">${v}%</text>`).join("")}</g>
       <g fill="#9AA4B2" font-size="11" font-family="Inter, sans-serif" text-anchor="middle">${series.map((b, i) => (n - 1 - i) % every ? "" : `<text x="${x(i)}" y="158">${tick(b)}</text>`).join("")}</g>
       ${known.length > 1 ? `<polyline points="${known.map((b) => `${x(b.i)},${y(b.rate)}`).join(" ")}" fill="none" stroke="#4C8DFF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : ""}
-      <g stroke="#161B22" stroke-width="2">${known.map((b) => `<circle cx="${x(b.i)}" cy="${y(b.rate)}" r="4.5" fill="${tier(b.rate).c}" tabindex="0" data-tip="${pointLabel(b)}: ${b.rate}% · ${tier(b.rate).name} (${b.first} of ${b.total})" aria-label="${pointLabel(b)}: ${b.rate}%, ${b.first} of ${b.total}"/>`).join("")}</g>
+      <g stroke="#161B22" stroke-width="2">${known.map((b) => `<circle cx="${x(b.i)}" cy="${y(b.rate)}" r="${n > 40 ? 3 : 4.5}" fill="${b.pr ? (b.pr.ok ? "#56D364" : "#F85149") : tier(b.rate).c}" tabindex="0" data-tip="${tip(b)}" aria-label="${tip(b)}"/>`).join("")}</g>
       ${known.length ? "" : `<text x="${(L + R) / 2}" y="85" text-anchor="middle" fill="#9AA4B2" font-size="12" font-family="Inter, sans-serif">No merged PRs in this period</text>`}
     </svg>${last ? `<div class="sub" style="margin-top:0">Latest: <b style="color:${tier(last.rate).c}">${last.rate}%</b> · ${tier(last.rate).name}</div>` : ""}</figure>`;
 }
