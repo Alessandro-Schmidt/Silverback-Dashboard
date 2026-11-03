@@ -117,12 +117,13 @@ function draw() {
         <p class="muted" style="margin:4px 0 0">${org} · ${repoName} · ${t.rows.length} active member${t.rows.length === 1 ? "" : "s"} ${periodLabel(t.period, t.at)}</p></div>
       </div>
     ${rankRow(`Silverback rate · ${repoName}`, t.rate, t.series, "Every author's PRs merged into develop")}
-    ${rankRow(`Silverback rate · ${org}`, s.orgRate, s.orgSeries, "PRs merged across the organization")}
+    ${rankRow(`Silverback rate · ${org}`, s.orgRate, s.orgSeries, "PRs merged into develop across the organization, bots left out")}
     ${s.repoRanks?.length ? `<section class="card" style="padding:16px 20px"><h2 class="section-title">Repositories by Silverback rate <span class="muted" style="font-weight:500">${s.repoRanks.length}</span></h2>
-      <div class="sub" style="margin:2px 0 12px">PRs merged across ${org}, ${periodLabel(s.period, s.at)}</div>
+      <div class="sub" style="margin:2px 0 12px">Each repo of ${org}: its PRs merged into develop ${periodLabel(s.period, s.at)}, bots left out. "3 / 4" means 3 of its 4 merged PRs were a first try.</div>
+      <div class="muted" style="display:flex;gap:12px;font-size:12px;margin-bottom:6px"><span style="width:24px;text-align:right">#</span><span style="flex:1">Repository</span><span>First tries / merged</span><span style="width:96px">Rate</span></div>
       <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px">${s.repoRanks.map((r, i) => `<li style="display:flex;align-items:center;gap:12px">
         <span class="mono muted" style="width:24px;text-align:right">${i + 1}</span><span style="flex:1;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</span>
-        <span class="muted" style="font-size:13px">${r.first}/${r.total}</span><span style="display:flex;align-items:center;gap:8px;width:96px">${rateCell(r.rate)}</span></li>`).join("")}</ol></section>` : ""}
+        <span class="mono muted" style="font-size:13px">${r.first} / ${r.total}</span><span style="display:flex;align-items:center;gap:8px;width:96px">${rateCell(r.rate)}</span></li>`).join("")}</ol></section>` : ""}
     <section class="team-stats" aria-label="Team stats">
       ${stat("Merged PRs", t.merged, "all members, into develop")}
       ${stat("Median cycle time", t.cycle == null ? "—" : `${t.cycle.toFixed(1)} d`, "opened → merged")}

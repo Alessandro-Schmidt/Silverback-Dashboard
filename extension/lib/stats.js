@@ -22,7 +22,9 @@ export const queries = (repo, org, since) => {
       ${PR_SEARCH("orgOpen", `org:${org} is:pr is:open`, "issueCount", 1)} }`,
     mine: `{ ${PR_SEARCH("myDevelop", `${develop}${after} sort:updated-desc`, `nodes{ ... on PullRequest { createdAt mergedAt additions deletions ${REVIEWS} } }`)} }`,
     repo: `{ ${PR_SEARCH("repoMerged", `repo:${repo} is:pr is:merged base:develop${after}`, `nodes{ ... on PullRequest { mergedAt ${REVIEWS} } }`)} }`,
-    org: `{ ${PR_SEARCH("orgMerged", `org:${org} is:pr is:merged${after}`, `nodes{ ... on PullRequest { mergedAt repository{ name } ${REVIEWS} } }`)} }`,
+    // Paged with $after (see fetchOrgMerged): same rules as the repo, develop only and no bots.
+    org: `query($after:String){ orgMerged: search(query:"org:${org} is:pr is:merged base:develop ${BOTS}${after}",type:ISSUE,first:100,after:$after){
+      pageInfo{ hasNextPage endCursor } nodes{ ... on PullRequest { mergedAt repository{ name } ${REVIEWS} } } } }`,
   };
 };
 
@@ -249,8 +251,22 @@ export const listRepos = async (token, org) =>
 export async function fetchStats(token, repo, org, period = DEFAULT_PERIOD) {
   const now = Date.now(), since = periodStart(now, validPeriod(period)), q = queries(repo, org, since);
   const [core, pulse, mine, repoM, orgM] = await Promise.all([
-    gql(token, q.core), gql(token, q.pulse).catch(() => null), gql(token, q.mine), gql(token, q.repo), gql(token, q.org)]);
+    gql(token, q.core), gql(token, q.pulse).catch(() => null), gql(token, q.mine), gql(token, q.repo), fetchOrgMerged(token, q.org)]);
   return summarize({ ...core, pulse, ...mine, ...repoM, ...orgM }, repo, org, period, now);
+}
+
+// Every merged PR of the org in the period, 100 per page.
+// ponytail: stops at 5 pages (500 PRs), like the team view; raise it if big orgs get cut short.
+async function fetchOrgMerged(token, query) {
+  const nodes = [];
+  let after = null;
+  for (let page = 0; page < 5; page++) {
+    const { orgMerged: r } = await gql(token, query, { after });
+    nodes.push(...r.nodes);
+    if (!r.pageInfo.hasNextPage) break;
+    after = r.pageInfo.endCursor;
+  }
+  return { orgMerged: { nodes } };
 }
 
 // Merged PRs per month into the repo's develop, over its whole history. The chart only needs counts, so each month is
