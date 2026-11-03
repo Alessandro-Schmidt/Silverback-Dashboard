@@ -47,15 +47,41 @@ function crestSvg(rate, size) {
 }
 
 // The card a crest opens: what the Silverback rate is and the four tiers. Put it in a <dialog> once per page.
-export const explainer = () => `
+export const explainer = (rulesLink = false) => `
   <h2 style="margin:0;font-size:20px;font-weight:800;letter-spacing:-.02em">The Silverback rate</h2>
   <p>The share of merged pull requests that were <b>approved on the first review</b>: no reviewer asked for changes
-    before the first approval. Higher means your PRs land clean, without a round of rework.</p>
+    and no commit was pushed after opening for review, before the first approval. Draft commits are fine.</p>
   <p>It's computed for the period you pick, for you (your PRs merged into <code>develop</code>), for the repository
     (every author) and for the whole organization. With nothing merged there is no rate yet.</p>
   <ul class="tier-list">${TIERS.map((t) => `<li>${crestSvg(t.min === 90 ? 95 : t.min + 1, 34)}<span><b style="color:${t.c}">${t.name}</b>
     <span class="muted">${t.min === 90 ? "90–100%" : `${t.min}–${t.min + 29}%`}</span></span></li>`).join("")}</ul>
+  ${rulesLink ? `<p><a href="#rate">All the rules</a></p>` : ""}
   <form method="dialog"><button class="explain-close">Got it</button></form>`;
+
+// The full rules, as a page of the app (#rate).
+export const ratePage = () => `<article class="card rate-page" style="max-width:760px;margin:0 auto;line-height:1.55">
+  <h1 style="margin:0 0 8px">The Silverback rate</h1>
+  <p>The share of merged pull requests that went through review <b>on the first try</b>. Higher means your PRs land clean, without a round of rework.</p>
+  <h2>What counts</h2>
+  <ul><li><b>You</b> and <b>the repository</b>: PRs merged into <code>develop</code> during the period you pick (only yours, or every author's).</li>
+    <li><b>The organization</b>: every PR merged anywhere in the organization during the period.</li>
+    <li>With nothing merged, there is no rate yet: it shows "—" and no badge.</li></ul>
+  <h2>A first try</h2>
+  <p>A merged PR is a first try when all three hold:</p>
+  <ol><li>It was <b>approved</b>.</li>
+    <li><b>No reviewer requested changes</b> before the first approval.</li>
+    <li><b>No commit was pushed</b> while it waited for that approval, counting from when it was last marked ready for review (or opened, if never a draft).</li></ol>
+  <h2>What doesn't hurt you</h2>
+  <ul><li>Commits pushed while the PR is still a draft.</li><li>Comments that aren't change requests.</li>
+    <li>Pushes after the approval, like a conflict fix: GitHub dismisses the approval, but it still counts.</li></ul>
+  <h2>Tiers</h2>
+  <p>The rate is first tries divided by merged PRs, rounded to a whole percent.</p>
+  <ul class="tier-list">${TIERS.map((t) => `<li>${crestSvg(t.min === 90 ? 95 : t.min + 1, 34)}<span><b style="color:${t.c}">${t.name}</b>
+    <span class="muted">${t.min === 90 ? "90–100%" : `${t.min}–${t.min + 29}%`}</span></span></li>`).join("")}</ul>
+  <h2>Good to know</h2>
+  <ul><li>Rebasing draft commits after opening for review resets their dates, so they count as new pushes.</li>
+    <li>Only the last 100 commits and the first 50 reviews of a PR are looked at.</li></ul>
+</article>`;
 
 // Silverback rate over time (one point per day, week or month from series), on faint tier bands.
 export function rateChart(series, title, sub) {

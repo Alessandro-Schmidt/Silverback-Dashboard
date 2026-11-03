@@ -1,6 +1,6 @@
 import { Preferences } from "@capacitor/preferences";
 import { startLoading } from "./loader.js";
-import { crest, explainer, rateChart } from "./extension/lib/crest.js";
+import { crest, explainer, ratePage, rateChart } from "./extension/lib/crest.js";
 import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, pointLabel, tick, validPeriod, DEFAULT_PERIOD, setStatus, fetchDetail, outlook, tenure, tier, TIERS } from "./extension/lib/stats.js";
 import { renderTeam, loadTeam, rankCard } from "./team.js";
 import "./tooltip.js";
@@ -82,7 +82,7 @@ function render(s) {
   if (!s.mySeries?.[0] || !("merged" in s.mySeries[0])) return; // cache from an older version
   shown = s;
   for (const a of $("tabs").querySelectorAll("a")) a.toggleAttribute("aria-current", a.dataset.view === view());
-  if (view() === "team") return route();
+  if (view() !== "me") return route();
   const repoName = esc(s.repo.split("/")[1]), org = esc(s.org);
   const drafts = s.myOpen.filter((p) => p.draft).length, open = s.myOpen.length - drafts;
   const r = s.mine, t = tier(r.rate);
@@ -265,15 +265,17 @@ async function load(animate) {
   }
 }
 
-// Views: My stats (#) and Team (#team), open to everyone.
-const view = () => (location.hash === "#team" ? "team" : "me");
+// Views: My stats (#), Team (#team) and the Silverback rate rules (#rate, needs no data), open to everyone.
+const view = () => ({ "#team": "team", "#rate": "rate" })[location.hash] || "me";
 function route() {
   for (const a of $("tabs").querySelectorAll("a")) a.toggleAttribute("aria-current", a.dataset.view === view());
+  if (view() === "rate") return void (app.innerHTML = ratePage());
   if (!shown) return;
   if (view() === "me") return render(shown);
   renderTeam(app, shown);
 }
 window.addEventListener("hashchange", async () => {
+  $("explain").close();
   route();
   if (view() === "team" && shown && !busy) {
     busy = true; setBusy(true);
@@ -335,7 +337,7 @@ $("refresh").addEventListener("click", () => refresh());
 // Any crest opens the card that explains the Silverback rate.
 document.addEventListener("click", (e) => {
   if (!e.target.closest?.("[data-explain]")) return;
-  $("explain").innerHTML = explainer();
+  $("explain").innerHTML = explainer(true);
   $("explain").showModal();
 });
 $("explain").addEventListener("click", (e) => { if (e.target === $("explain")) $("explain").close(); }); // click outside the card
