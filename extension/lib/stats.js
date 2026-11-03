@@ -3,6 +3,10 @@
 // Personal stats are scoped to the configured repo; @me is the token's owner.
 // Commits and "ready for review" events, so a push after leaving draft can be told apart from draft work.
 const PUSHES = "createdAt timelineItems(last:100,itemTypes:[READY_FOR_REVIEW_EVENT,PULL_REQUEST_COMMIT]){ nodes{ ... on ReadyForReviewEvent{ createdAt } ... on PullRequestCommit{ commit{ committedDate } } } }";
+// Conversation comments plus inline code review comments (comments{totalCount} alone misses the latter).
+// ponytail: first 100 review threads; a PR with more undercounts.
+const COMMENTS = "comments{totalCount} reviewThreads(first:100){ nodes{ comments{totalCount} } }";
+export const commentCount = (p) => p.comments.totalCount + (p.reviewThreads?.nodes || []).reduce((n, t) => n + t.comments.totalCount, 0);
 const REVIEWS = `reviews(first:50){ nodes{ state submittedAt } } ${PUSHES}`;
 const PR_SEARCH = (alias, q, fields, first = 100) => `${alias}: search(query:"${q.replace(/"/g, '\\"')}",type:ISSUE,first:${first}){ ${fields} }`;
 export const queries = (repo, org, since) => {
@@ -12,7 +16,7 @@ export const queries = (repo, org, since) => {
     core: `{ viewer{ login avatarUrl }
       repository(owner:"${owner}",name:"${name}"){ pullRequests(states:OPEN){totalCount} issues(states:OPEN){totalCount} stargazerCount }
       organization(login:"${org}"){ avatarUrl }
-      ${PR_SEARCH("myOpen", `repo:${repo} is:pr is:open author:@me`, "nodes{ ... on PullRequest { number title url isDraft createdAt headRefName comments{totalCount} reviews{totalCount} } }")}
+      ${PR_SEARCH("myOpen", `repo:${repo} is:pr is:open author:@me`, `nodes{ ... on PullRequest { number title url isDraft createdAt headRefName reviewDecision ${COMMENTS} reviews{totalCount} } }`)}
       ${PR_SEARCH("myFirst", `org:${org} author:@me sort:created-asc`, "nodes{ ... on PullRequest { createdAt } ... on Issue { createdAt } }", 1)}
       ${PR_SEARCH("myMerged", develop + after, "issueCount", 1)}
       ${PR_SEARCH("myIssues", `repo:${repo} is:issue is:open assignee:@me`, `nodes{ ... on Issue { number title url createdAt issueType{ name } labels(first:10){ nodes{ name } } subIssuesSummary{ total completed } closedByPullRequestsReferences(first:1){ nodes{ number } }
@@ -183,7 +187,7 @@ export function summarize(data, repo, org, period = DEFAULT_PERIOD, now = Date.n
     me: data.viewer.login, meAvatar: data.viewer.avatarUrl, orgRepos: o.totalCount, orgLogo: data.organization.avatarUrl,
     orgPrs: data.pulse?.orgOpen.issueCount ?? null,
     // Oldest first; `type` is the branch prefix (feat/…, fix/…).
-    myOpen: data.myOpen.nodes.map((p) => ({ num: p.number, title: p.title, url: p.url, draft: p.isDraft, comments: p.comments.totalCount, reviews: p.reviews.totalCount,
+    myOpen: data.myOpen.nodes.map((p) => ({ num: p.number, title: p.title, url: p.url, draft: p.isDraft, comments: commentCount(p), reviews: p.reviews.totalCount, changes: p.reviewDecision === "CHANGES_REQUESTED",
       type: p.headRefName.includes("/") ? p.headRefName.split("/")[0] : "", createdAt: p.createdAt })).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     myIssues: data.myIssues.nodes.map((i) => {
       const item = i.projectItems.nodes.find((n) => n.fieldValueByName?.name), v = item?.fieldValueByName;
@@ -225,7 +229,7 @@ export const setStatus = (token, { project, item, field }, optionId) =>
 
 // Everything the details drawer shows, fetched when it opens: kind is "pr" or "issue".
 const DETAIL = {
-  pr: `pullRequest(number:$n){ number title url isDraft createdAt headRefName baseRefName additions deletions changedFiles comments{totalCount}
+  pr: `pullRequest(number:$n){ number title url isDraft createdAt headRefName baseRefName additions deletions changedFiles ${COMMENTS}
     reviews(first:50){ nodes{ state submittedAt author{ login } } } ${PUSHES} reviewRequests(first:10){ nodes{ requestedReviewer{ ... on User{ login } } } }
     commits(last:1){ nodes{ commit{ statusCheckRollup{ state } } } } closingIssuesReferences(first:1){ nodes{ number title } } }`,
   issue: `issue(number:$n){ number title url createdAt bodyHTML issueType{ name } labels(first:10){ nodes{ name color } } assignees(first:5){ nodes{ login } }

@@ -1,7 +1,7 @@
 import { Preferences } from "@capacitor/preferences";
 import { startLoading } from "./loader.js";
 import { crest, explainer, ratePage, rateChart } from "./extension/lib/crest.js";
-import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, pointLabel, tick, validPeriod, DEFAULT_PERIOD, setStatus, fetchDetail, outlook, tenure, tier, TIERS } from "./extension/lib/stats.js";
+import { fetchStats, listOrgs, listRepos, PERIOD_ORDER, periodOption, periodLabel, pointLabel, tick, validPeriod, DEFAULT_PERIOD, setStatus, fetchDetail, outlook, commentCount, tenure, tier, TIERS } from "./extension/lib/stats.js";
 import { renderTeam, loadTeam, rankCard } from "./team.js";
 import "./tooltip.js";
 import "./copy.js";
@@ -136,6 +136,7 @@ function render(s) {
         <span class="mono muted" style="font-size:13px;width:48px">#${p.num}</span>
         <a href="${esc(p.url)}" target="_blank" rel="noopener" title="${esc(p.title)}" data-detail="pr:${p.num}">${esc(p.title)}</a>
         ${p.type ? `<span class="mono tag">${esc(p.type)}</span>` : ""}
+        ${p.changes ? `<span class="chip" style="color:#D07A2A;border-color:#D07A2A;white-space:nowrap" title="A reviewer requested changes">Changes requested</span>` : ""}
         <span class="muted" style="display:flex;align-items:center;gap:4px;font-size:12px;width:32px;justify-content:flex-end" aria-label="${p.comments} comments">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${p.comments}</span>
       </div>`).join("") || `<p class="muted" style="padding:16px 20px">No open PRs.</p>`}</div>
@@ -391,7 +392,7 @@ function prBody(p) {
       <span style="background:#172A4A;color:var(--link);border-radius:6px;padding:3px 8px">${esc(p.headRefName)}</span><span class="muted">→</span>
       <span style="background:var(--line);border-radius:6px;padding:3px 8px">${esc(p.baseRefName)}</span></div>
     <div class="well"><div style="font-weight:700;color:${outC}">${outT}</div><div class="sub" style="margin-top:2px">${outS}</div></div>
-    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${stat(`${Math.floor((Date.now() - new Date(p.createdAt)) / 864e5)} d`, "Open for")}${stat(p.comments.totalCount, "Comments")}${stat(chk, "Checks", chkC)}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${stat(`${Math.floor((Date.now() - new Date(p.createdAt)) / 864e5)} d`, "Open for")}${stat(commentCount(p), "Comments")}${stat(chk, "Checks", chkC)}</div>
     ${section(`Changes · size ${tot < 50 ? "S" : tot < 200 ? "M" : "L"}`, `<div style="display:flex;gap:12px;font-size:13px;margin-bottom:8px"><span class="mono" style="color:var(--ok)">+${p.additions}</span><span class="mono" style="color:#F85149">−${p.deletions}</span><span class="muted">${p.changedFiles} files</span></div>
       <div style="display:flex;gap:2px;height:8px" role="img" aria-label="${p.additions} lines added, ${p.deletions} removed"><div style="width:${(p.additions / tot) * 100}%;background:var(--ok);border-radius:4px 0 0 4px"></div><div style="width:${(p.deletions / tot) * 100}%;background:#F85149;border-radius:0 4px 4px 0"></div></div>`)}
     ${section("Reviews", reviewers.map(([who, st]) => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="font-weight:600">${esc(who)}</span><span style="margin-left:auto;font-size:12px;font-weight:600;color:${REVIEW[st]?.[1] || "var(--muted)"}">${REVIEW[st]?.[0] || esc(st)}</span></div>`).join("")
