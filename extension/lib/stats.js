@@ -3,10 +3,11 @@
 // Personal stats are scoped to the configured repo; @me is the token's owner.
 // Commits and "ready for review" events, so a push after leaving draft can be told apart from draft work.
 const PUSHES = "createdAt timelineItems(last:100,itemTypes:[READY_FOR_REVIEW_EVENT,PULL_REQUEST_COMMIT]){ nodes{ ... on ReadyForReviewEvent{ createdAt } ... on PullRequestCommit{ commit{ committedDate } } } }";
-// Conversation comments plus inline code review comments (comments{totalCount} alone misses the latter).
-// ponytail: first 100 review threads; a PR with more undercounts.
-const COMMENTS = "comments{totalCount} reviewThreads(first:100){ nodes{ comments{totalCount} } }";
-export const commentCount = (p) => p.comments.totalCount + (p.reviewThreads?.nodes || []).reduce((n, t) => n + t.comments.totalCount, 0);
+// Conversation comments, inline code review comments and the text of reviews (a change request often only has that).
+// ponytail: first 100 review threads and 50 reviews; a PR with more undercounts.
+const COMMENTS = "comments{totalCount} reviewThreads(first:100){ nodes{ comments{totalCount} } } bodies: reviews(first:50){ nodes{ body } }";
+export const commentCount = (p) => p.comments.totalCount + (p.reviewThreads?.nodes || []).reduce((n, t) => n + t.comments.totalCount, 0)
+  + (p.bodies?.nodes || []).filter((r) => r.body?.trim()).length;
 const REVIEWS = `reviews(first:50){ nodes{ state submittedAt } } ${PUSHES}`;
 const PR_SEARCH = (alias, q, fields, first = 100) => `${alias}: search(query:"${q.replace(/"/g, '\\"')}",type:ISSUE,first:${first}){ ${fields} }`;
 export const queries = (repo, org, since) => {
